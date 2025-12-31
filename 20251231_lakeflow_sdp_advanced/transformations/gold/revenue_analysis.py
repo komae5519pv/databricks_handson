@@ -1,7 +1,7 @@
 from pyspark import pipelines as dp
 from pyspark.sql import functions as F
 
-@dp.table(
+@dp.materialized_view(
     name="gd_revenue_report",
     comment="[Materialized View] 多角的な分析用ディメンションを付与した売上レポート。"
 )
