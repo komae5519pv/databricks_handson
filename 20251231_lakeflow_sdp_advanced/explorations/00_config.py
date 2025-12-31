@@ -1,7 +1,7 @@
 # Databricks notebook source
 # カタログ、スキーマ、ボリューム
-MY_CATALOG = "komae_demo_v4"            # 使用したいカタログ名に変更してください
-MY_SCHEMA = "ws_sdp_adv"                # 使用したいスキーマ名に変更してください
+MY_CATALOG = "lakeflow_sdp_workshop"             # 使用したいカタログ名に変更してください
+MY_SCHEMA = "advanced_<your_name>"      # 使用したいスキーマ名に変更してください
 MY_VOLUME = "raw"
 
 # 商品マスターのテーブル名 (上流データソース)

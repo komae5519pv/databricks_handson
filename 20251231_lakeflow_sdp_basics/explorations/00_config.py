@@ -1,6 +1,6 @@
 # Databricks notebook source
 # カタログ、スキーマ、ボリューム
-MY_CATALOG = "sdp_workshop"             # 使用したいカタログ名に変更してください
+MY_CATALOG = "lakeflow_sdp_workshop"             # 使用したいカタログ名に変更してください
 MY_SCHEMA = "basic_<your_name>"         # 使用したいスキーマ名に変更してください
 MY_VOLUME = "raw"
 
