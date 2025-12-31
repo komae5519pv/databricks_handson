@@ -3,7 +3,14 @@ from pyspark.sql import functions as F
 
 @dp.materialized_view(
     name="gd_revenue_report",
-    comment="[Materialized View] 多角的な分析用ディメンションを付与した売上レポート。"
+    comment="[Materialized View] 多角的な分析用ディメンションを付与した売上レポート。",
+    # 更新時の計算コストを抑えるための優先順位指定
+    # - SPUJReplaceWhere: 差分のみ入れ替え
+    # - PartitionOverwrite: 影響のあったパーティションごと入れ替え
+    # - CompleteRecompute: フルリフレッシュ
+    spark_conf={
+        "pipelines.enzyme.physicalFlowPriority": "SPUJReplaceWhere > PartitionOverwrite > CompleteRecompute"
+    }
 )
 def gd_revenue_report():
     """

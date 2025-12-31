@@ -1,7 +1,7 @@
 from pyspark import pipelines as dp
 from pyspark.sql import functions as F
 
-# --- Step 1: Factデータの確定 (Streaming + Watermark) ---
+# --- Factデータの確定 (Streaming + Watermark) ---
 # このテーブルは「新着データの制御」に専念します。
 @dp.table(
     name="sl_transactions_watermarked",
@@ -39,7 +39,14 @@ def sl_transactions_watermarked():
 # このテーブルが、マスタ補充（Backfill）時の「自動補完」を担います。
 @dp.materialized_view(
     name="sl_transactions_enriched",
-    comment="マスタ情報を結合した分析用Silverテーブル。マスタ更新時に過去のNULLを自動補完する。"
+    comment="マスタ情報を結合した分析用Silverテーブル。マスタ更新時に過去のNULLを自動補完する。",
+    # 更新時の計算コストを抑えるための優先順位指定
+    # - SPUJReplaceWhere: 差分のみ入れ替え
+    # - PartitionOverwrite: 影響のあったパーティションごと入れ替え
+    # - CompleteRecompute: フルリフレッシュ
+    spark_conf={
+        "pipelines.enzyme.physicalFlowPriority": "SPUJReplaceWhere > PartitionOverwrite > CompleteRecompute"
+    }
 )
 # マスタ不在（user_nameがNULL）を検知。
 # マテリアライズド・ビューなので、バックフィル後にここが「パス（警告なし）」に変わる様子が見せられる。
