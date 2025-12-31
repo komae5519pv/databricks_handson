@@ -26,13 +26,11 @@ volume_dir = f"/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/"
 users_dir = f"{volume_dir}users/"                              # 顧客マスタ
 transactions_east_dir = f"{volume_dir}/transactions_east/"    # 購買履歴（East）
 transactions_west_dir = f"{volume_dir}/transactions_west/"    # 購買履歴（West）
-# products_dir = f"{volume_dir}products/"                        # 商品マスタ
 
 # 上記で指定したディレクトリの作成
 dbutils.fs.mkdirs(users_dir)
 dbutils.fs.mkdirs(transactions_east_dir)
 dbutils.fs.mkdirs(transactions_west_dir)
-# dbutils.fs.mkdirs(products_dir)
 
 print(f"MY_CATALOG: {MY_CATALOG}")
 print(f"MY_SCHEMA: {MY_SCHEMA}")
@@ -41,4 +39,3 @@ print(f"users_dir: {users_dir}")
 print(f"transactions_east_dir: {transactions_east_dir}")
 print(f"transactions_west_dir: {transactions_west_dir}")
 print(f"products_source_table: {products_source_table}")
-# print(f"products_dir: {products_dir}")
