@@ -24,9 +24,8 @@ def sl_transactions_watermarked():
             .withColumn("transaction_date", F.col("transaction_date").cast("timestamp"))
             .withColumn("amount", F.col("amount").cast("double"))
 
-            # [Watermark] イベント時刻を基準に遅延許容幅を宣言（1日）。
-            #             実運用では到着遅延の実績に合わせて調整。
-            .withWatermark("transaction_date", "1 day")
+            # [Watermark] イベント時刻を基準に遅延許容幅を宣言（10分）
+            .withWatermark("transaction_date", "10 minutes")
 
             # [状態算子で遅延ドロップを発動]
             #  - Watermarkと組み合わせることで、水位より古いイベントを状態外として破棄。
