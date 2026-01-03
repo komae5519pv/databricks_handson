@@ -1,3 +1,11 @@
+def get_quantity_price_rules():
+  return {
+      # 購入数量が1以上でないものは不正な受注履歴とみなす
+      "quantity_is_more_than_1": "quantity >= 1",
+      # 購入代金が1以上でないものは不正な受注履歴とみなす
+      "amount_is_more_than_1": "amount >= 1"
+  }
+
 def get_master_check_rules():
   return {
       # 販売履歴に商品マスターを左外部結合した時、products側のPrimary Keyである

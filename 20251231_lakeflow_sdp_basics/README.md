@@ -22,8 +22,9 @@
   * `revenue_by_user_segment.py`: 性別・地域・年代別の売上分析
   * `revenue_by_subcategory.py`: カテゴリ・サブカテゴリ別の売上分析
 
-  構文の詳細は https://docs.databricks.com/ldp/developer/python-ref を参照してください。<br>
-  チュートリアルや参考資料は https://docs.databricks.com/ldp をご覧ください。<br>
+  [構文の詳細はこちらをご覧ください](https://docs.databricks.com/ldp/developer/python-ref)<br>
+  [チュートリアルや参考資料はこちらをご覧ください](https://docs.databricks.com/ldp)<br>
+  [Spark Declarative Pipelines Programming Guide](https://spark.apache.org/docs/latest/declarative-pipelines-programming-guide.html#flows)<br>
 
 ### 📝 explorations/
 

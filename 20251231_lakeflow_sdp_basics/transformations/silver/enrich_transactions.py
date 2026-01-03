@@ -1,12 +1,10 @@
 # from pyspark import pipelines as dp
 # from pyspark.sql.functions import col, date_format
-# from utilities import expectation_rules
 
-# master_check = expectation_rules.get_master_check_rules()
-
+# @dp.table(name="sl_transactions")
 # def transactions_enriched():
 #     return (
-#         dp.read_stream("bz_transactions")
+#         dp.read_stream("bz_transactions_all")
 #         .join(dp.read("bz_users"), "user_id", "left")
 #         .join(dp.read("bz_products"), "product_id", "left")
 

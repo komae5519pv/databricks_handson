@@ -7,16 +7,14 @@ master_check = expectation_rules.get_master_check_rules()
 @dp.table(name="sl_transactions")
 
 # --- データ品質管理 (Expectations) ---
-@dp.expect("amount_positive", "amount > 0")                     # WARN (警告)
+# マスターに存在する商品、ユーザーかどうかのデータ品質チェックを適用
+@dp.expect_all_or_drop(master_check)                            # DROP (除外)
 @dp.expect("valid_email_format", "email LIKE '%@%'" )           # WARN (警告)
 @dp.expect("valid_date", "transaction_date >= '2020-01-01'")    # WARN (警告)
-@dp.expect_all_or_drop(master_check)                            # DROP (除外)
-# @dp.expect_or_drop("valid_date", "transaction_date >= '2020-01-01'")  # DROP (除外)
-# @dp.expect_all_or_fail(master_check)                                  # FAIL (停止)
 
 def transactions_enriched():
     return (
-        dp.read_stream("bz_transactions")
+        dp.read_stream("bz_transactions_all")
         .join(dp.read("bz_users"), "user_id", "left")
         .join(dp.read("bz_products"), "product_id", "left")
 

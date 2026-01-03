@@ -4,7 +4,7 @@ MY_CATALOG = "lakeflow_sdp_workshop"          # 使用したいカタログ名�
 MY_SCHEMA = "basic_<your_name>"               # 使用したいスキーマ名に変更してください
 MY_VOLUME = "raw"
 
-# 商品マスターのテーブル名 (上流データソース)
+# 商品マスタのテーブル名 (上流データソース)
 products_source_table = f"{MY_CATALOG}.{MY_SCHEMA}.source_products"
 
 # COMMAND ----------
