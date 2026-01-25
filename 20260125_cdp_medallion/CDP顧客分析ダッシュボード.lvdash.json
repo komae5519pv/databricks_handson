@@ -1,0 +1,2845 @@
+{
+  "datasets": [
+    {
+      "name": "a2389636",
+      "displayName": "customer_analysis",
+      "queryLines": [
+        "WITH customer_base AS (\n",
+        "  SELECT\n",
+        "    -- 顧客基本情報\n",
+        "    u.user_id,\n",
+        "    u.name,\n",
+        "    u.gender,\n",
+        "    u.birth_date,\n",
+        "    u.pref,\n",
+        "    u.email,\n",
+        "    u.email_permission_flg,\n",
+        "    u.registration_date,\n",
+        "    u.status,\n",
+        "\n",
+        "    -- 行動クラスター\n",
+        "    u.behavior_cluster,\n",
+        "    u.behavior_cluster_name,\n",
+        "\n",
+        "    -- RFM指標\n",
+        "    u.last_purchase_date,\n",
+        "    u.recency,\n",
+        "    u.frequency,\n",
+        "    u.monetary,\n",
+        "    u.r_score,\n",
+        "    u.f_score,\n",
+        "    u.m_score,\n",
+        "    u.rfm_segment,\n",
+        "    u.customer_type,\n",
+        "\n",
+        "    -- 購買サマリ（商品属性別）\n",
+        "    COALESCE(purchase_summary.total_items, 0) as total_items,\n",
+        "    COALESCE(purchase_summary.organic_items, 0) as organic_items,\n",
+        "    COALESCE(purchase_summary.discount_items, 0) as discount_items,\n",
+        "    COALESCE(purchase_summary.ready_to_eat_items, 0) as ready_to_eat_items,\n",
+        "    COALESCE(purchase_summary.premium_items, 0) as premium_items\n",
+        "\n",
+        "  FROM <カタログ名>.<スキーマ名>.gd_users u\n",
+        "\n",
+        "  LEFT JOIN (\n",
+        "    SELECT\n",
+        "      user_id,\n",
+        "      COUNT(*) as total_items,\n",
+        "      SUM(CASE WHEN is_organic THEN 1 ELSE 0 END) as organic_items,\n",
+        "      SUM(CASE WHEN is_discount_target THEN 1 ELSE 0 END) as discount_items,\n",
+        "      SUM(CASE WHEN is_ready_to_eat THEN 1 ELSE 0 END) as ready_to_eat_items,\n",
+        "      SUM(CASE WHEN is_premium THEN 1 ELSE 0 END) as premium_items\n",
+        "    FROM <カタログ名>.<スキーマ名>.gd_order_items\n",
+        "    WHERE cancel_flg = FALSE\n",
+        "    GROUP BY user_id\n",
+        "  ) purchase_summary ON u.user_id = purchase_summary.user_id\n",
+        ")\n",
+        "SELECT\n",
+        "  c.*,\n",
+        "\n",
+        "  -- デシル分析（購買金額で10分割、1が上位10%）\n",
+        "  NTILE(10) OVER (ORDER BY monetary DESC) as decile_rank,\n",
+        "\n",
+        "  -- 購買比率\n",
+        "  CASE WHEN total_items > 0\n",
+        "    THEN ROUND(organic_items * 100.0 / total_items, 1)\n",
+        "    ELSE 0 END as organic_rate,\n",
+        "  CASE WHEN total_items > 0\n",
+        "    THEN ROUND(discount_items * 100.0 / total_items, 1)\n",
+        "    ELSE 0 END as discount_rate,\n",
+        "  CASE WHEN total_items > 0\n",
+        "    THEN ROUND(ready_to_eat_items * 100.0 / total_items, 1)\n",
+        "    ELSE 0 END as ready_to_eat_rate,\n",
+        "  CASE WHEN total_items > 0\n",
+        "    THEN ROUND(premium_items * 100.0 / total_items, 1)\n",
+        "    ELSE 0 END as premium_rate,\n",
+        "\n",
+        "  -- リピートタイミングステータス（クラスター別の臨界点に基づく）\n",
+        "  CASE\n",
+        "    -- 週末まとめ買い族: 7日/14日/21日\n",
+        "    WHEN behavior_cluster = '1' AND recency <= 7 THEN 'アクティブ'\n",
+        "    WHEN behavior_cluster = '1' AND recency <= 14 THEN '要介入'\n",
+        "    WHEN behavior_cluster = '1' AND recency <= 21 THEN '離反直前'\n",
+        "    WHEN behavior_cluster = '1' THEN '離反'\n",
+        "    -- 夜型値引きハンター: 5日/10日/14日\n",
+        "    WHEN behavior_cluster = '2' AND recency <= 5 THEN 'アクティブ'\n",
+        "    WHEN behavior_cluster = '2' AND recency <= 10 THEN '要介入'\n",
+        "    WHEN behavior_cluster = '2' AND recency <= 14 THEN '離反直前'\n",
+        "    WHEN behavior_cluster = '2' THEN '離反'\n",
+        "    -- 健康・こだわり層: 10日/14日/21日\n",
+        "    WHEN behavior_cluster = '3' AND recency <= 10 THEN 'アクティブ'\n",
+        "    WHEN behavior_cluster = '3' AND recency <= 14 THEN '要介入'\n",
+        "    WHEN behavior_cluster = '3' AND recency <= 21 THEN '離反直前'\n",
+        "    WHEN behavior_cluster = '3' THEN '離反'\n",
+        "    -- カテゴリジャンキー: 7日/10日/14日\n",
+        "    WHEN behavior_cluster = '4' AND recency <= 7 THEN 'アクティブ'\n",
+        "    WHEN behavior_cluster = '4' AND recency <= 10 THEN '要介入'\n",
+        "    WHEN behavior_cluster = '4' AND recency <= 14 THEN '離反直前'\n",
+        "    WHEN behavior_cluster = '4' THEN '離反'\n",
+        "    -- 平日夕方の時短族: 3日/7日/10日\n",
+        "    WHEN behavior_cluster = '5' AND recency <= 3 THEN 'アクティブ'\n",
+        "    WHEN behavior_cluster = '5' AND recency <= 7 THEN '要介入'\n",
+        "    WHEN behavior_cluster = '5' AND recency <= 10 THEN '離反直前'\n",
+        "    WHEN behavior_cluster = '5' THEN '離反'\n",
+        "    -- ランダム層: 14日/21日/30日\n",
+        "    WHEN behavior_cluster IS NULL AND recency <= 14 THEN 'アクティブ'\n",
+        "    WHEN behavior_cluster IS NULL AND recency <= 21 THEN '要介入'\n",
+        "    WHEN behavior_cluster IS NULL AND recency <= 30 THEN '離反直前'\n",
+        "    WHEN behavior_cluster IS NULL THEN '離反'\n",
+        "    ELSE 'アクティブ'\n",
+        "  END as recency_status\n",
+        "\n",
+        "  -- -- 施策フラグ（RFM×クラスター）\n",
+        "  -- CASE\n",
+        "  --   WHEN rfm_segment = 'ロイヤル顧客' AND behavior_cluster_name = '健康・こだわり層'\n",
+        "  --     THEN 'シナリオ1: プレミアム商品先行案内'\n",
+        "  --   WHEN rfm_segment = '離脱リスク' AND behavior_cluster_name = '平日夕方の時短族'\n",
+        "  --     THEN 'シナリオ2: ミールキット予約サービス'\n",
+        "  --   WHEN rfm_segment = '新規顧客' AND behavior_cluster_name = '週末まとめ買い族'\n",
+        "  --     THEN 'シナリオ3: 配送サービス無料'\n",
+        "  --   ELSE NULL\n",
+        "  -- END as campaign_scenario,\n",
+        "\n",
+        "  -- -- リピート促進施策（recency_statusに基づく）\n",
+        "  -- CASE\n",
+        "  --   -- 要介入の顧客に対する施策\n",
+        "  --   WHEN behavior_cluster = '1' AND recency > 7 AND recency <= 14\n",
+        "  --     THEN 'シナリオ4: 週末まとめ買いクーポン'\n",
+        "  --   WHEN behavior_cluster = '5' AND recency > 3 AND recency <= 7\n",
+        "  --     THEN 'シナリオ5: 本日限定惣菜セット'\n",
+        "  --   WHEN behavior_cluster = '3' AND recency > 10 AND recency <= 21\n",
+        "  --     THEN 'シナリオ6: 新着オーガニック商品案内'\n",
+        "  --   ELSE NULL\n",
+        "  -- END as retention_campaign\n",
+        "\n",
+        "FROM customer_base c"
+      ]
+    },
+    {
+      "name": "4df6efb1",
+      "displayName": "transaction_analysis",
+      "queryLines": [
+        "SELECT\n",
+        "  -- 注文明細情報\n",
+        "  oi.order_item_id,\n",
+        "  oi.order_id,\n",
+        "  oi.user_id,\n",
+        "\n",
+        "  -- 店舗情報\n",
+        "  oi.store_id,\n",
+        "  oi.store_name,\n",
+        "  oi.store_area,\n",
+        "\n",
+        "  -- 商品情報\n",
+        "  oi.item_id,\n",
+        "  oi.item_name,\n",
+        "  oi.category_id,\n",
+        "  oi.category_name,\n",
+        "\n",
+        "  -- 商品属性\n",
+        "  oi.is_organic,\n",
+        "  oi.is_discount_target,\n",
+        "  oi.is_ready_to_eat,\n",
+        "  oi.is_premium,\n",
+        "\n",
+        "  -- 金額情報\n",
+        "  oi.quantity,\n",
+        "  oi.unit_price,\n",
+        "  oi.subtotal,\n",
+        "  oi.cancel_flg,\n",
+        "\n",
+        "  -- 日時情報\n",
+        "  oi.order_datetime,\n",
+        "  oi.order_date,\n",
+        "  oi.order_hour,\n",
+        "  oi.order_dayofweek,\n",
+        "  oi.is_weekend,\n",
+        "\n",
+        "  -- 曜日名（表示用）\n",
+        "  CASE oi.order_dayofweek\n",
+        "    WHEN 1 THEN '日曜'\n",
+        "    WHEN 2 THEN '月曜'\n",
+        "    WHEN 3 THEN '火曜'\n",
+        "    WHEN 4 THEN '水曜'\n",
+        "    WHEN 5 THEN '木曜'\n",
+        "    WHEN 6 THEN '金曜'\n",
+        "    WHEN 7 THEN '土曜'\n",
+        "  END as order_dayofweek_name,\n",
+        "\n",
+        "  -- 時間帯区分\n",
+        "  CASE\n",
+        "    WHEN oi.order_hour BETWEEN 6 AND 9 THEN '朝（6-9時）'\n",
+        "    WHEN oi.order_hour BETWEEN 10 AND 12 THEN '午前（10-12時）'\n",
+        "    WHEN oi.order_hour BETWEEN 13 AND 15 THEN '午後（13-15時）'\n",
+        "    WHEN oi.order_hour BETWEEN 16 AND 18 THEN '夕方（16-18時）'\n",
+        "    WHEN oi.order_hour BETWEEN 19 AND 21 THEN '夜（19-21時）'\n",
+        "    ELSE 'その他'\n",
+        "  END as time_period,\n",
+        "\n",
+        "  -- 顧客セグメント情報\n",
+        "  oi.behavior_cluster,\n",
+        "  oi.behavior_cluster_name,\n",
+        "  oi.r_score,\n",
+        "  oi.f_score,\n",
+        "  oi.m_score,\n",
+        "  oi.rfm_segment,\n",
+        "\n",
+        "  -- 新規・既存フラグ\n",
+        "  oi.customer_type\n",
+        "\n",
+        "FROM <カタログ名>.<スキーマ名>.gd_order_items oi"
+      ],
+      "columns": [
+        {
+          "displayName": "客単価",
+          "description": "1注文あたりの平均購買金額",
+          "expression": "SUM(subtotal) / COUNT(DISTINCT order_id)"
+        }
+      ]
+    },
+    {
+      "name": "a9df649a",
+      "displayName": "decile_rank",
+      "queryLines": [
+        "WITH decile_base AS (\n",
+        "  SELECT\n",
+        "    user_id,\n",
+        "    monetary,\n",
+        "    NTILE(10) OVER (ORDER BY monetary DESC) AS decile_rank\n",
+        "  FROM <カタログ名>.<スキーマ名>.gd_users\n",
+        "  WHERE monetary IS NOT NULL\n",
+        "),\n",
+        "decile_summary AS (\n",
+        "  SELECT\n",
+        "    decile_rank,\n",
+        "    COUNT(*) AS customer_count,\n",
+        "    SUM(monetary) AS monetary_sum\n",
+        "  FROM decile_base\n",
+        "  GROUP BY decile_rank\n",
+        "),\n",
+        "decile_total AS (\n",
+        "  SELECT SUM(monetary_sum) AS total_monetary FROM decile_summary\n",
+        ")\n",
+        "SELECT\n",
+        "  d.decile_rank,\n",
+        "  d.customer_count,\n",
+        "  d.monetary_sum,\n",
+        "  ROUND(d.monetary_sum / t.total_monetary * 100, 1) AS contribution_pct,\n",
+        "  ROUND(SUM(d.monetary_sum) OVER (ORDER BY d.decile_rank) / t.total_monetary * 100, 1) AS cumulative_pct\n",
+        "FROM decile_summary d\n",
+        "CROSS JOIN decile_total t\n",
+        "ORDER BY d.decile_rank"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "89212f48",
+      "displayName": "経営サマリー",
+      "layout": [
+        {
+          "widget": {
+            "name": "031f1e15",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## 経営サマリー"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "koubai-kikan",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_order_date",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "order_date",
+                      "expression": "`order_date`"
+                    },
+                    {
+                      "name": "order_date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "order_date",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_order_date"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "購買期間"
+              },
+              "selection": {
+                "defaultSelection": {
+                  "operator": {
+                    "operator": "AND",
+                    "args": []
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "tenpo-eria",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f9a72779179c8afc6164b3f2baf0_store_area",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "store_area",
+                      "expression": "`store_area`"
+                    },
+                    {
+                      "name": "store_area_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "store_area",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f9a72779179c8afc6164b3f2baf0_store_area"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "店舗エリア"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 1,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "tenpo-mei",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f9a72779179c8afc6164b3f2baf0_store_name",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "store_name",
+                      "expression": "`store_name`"
+                    },
+                    {
+                      "name": "store_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "store_name",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f9a72779179c8afc6164b3f2baf0_store_name"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "店舗名"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 1,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "rfm-segment",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_rfm_segment",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "rfm_segment",
+                      "expression": "`rfm_segment`"
+                    },
+                    {
+                      "name": "rfm_segment_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "rfm_segment",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_rfm_segment"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "RFMセグメント"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "jikan-tai",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_time_period",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "time_period",
+                      "expression": "`time_period`"
+                    },
+                    {
+                      "name": "time_period_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "time_period",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_time_period"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "時間帯"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "youbi",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_order_dayofweek_name",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "order_dayofweek_name",
+                      "expression": "`order_dayofweek_name`"
+                    },
+                    {
+                      "name": "order_dayofweek_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "order_dayofweek_name",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_order_dayofweek_name"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "曜日"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "uriage-kingaku",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "sum(subtotal)",
+                      "expression": "SUM(`subtotal`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(subtotal)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "all"
+                    },
+                    "significantFigures": {
+                      "type": "exact",
+                      "figures": 3
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "売上金額"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "zhu-wen-jian-shu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "countdistinct(order_id)",
+                      "expression": "COUNT(DISTINCT `order_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "countdistinct(order_id)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 0
+                    },
+                    "significantFigures": {
+                      "type": "exact",
+                      "figures": 3
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "注文件数"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 3,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kyakutanka",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "measure(客単価)",
+                      "expression": "MEASURE(`客単価`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(客単価)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    },
+                    "significantFigures": {
+                      "type": "exact",
+                      "figures": 3
+                    },
+                    "hideGroupSeparator": false
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "客単価"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 3,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "nichibetsu-urage-suii",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "customer_type",
+                      "expression": "`customer_type`"
+                    },
+                    {
+                      "name": "yearly(order_date)",
+                      "expression": "DATE_TRUNC(\"YEAR\", `order_date`)"
+                    },
+                    {
+                      "name": "sum(subtotal)",
+                      "expression": "SUM(`subtotal`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "yearly(order_date)",
+                  "format": {
+                    "type": "date",
+                    "date": "year-month-day",
+                    "leadingZeros": true
+                  },
+                  "axis": {
+                    "labelAngle": 90
+                  },
+                  "displayName": "購買年",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(subtotal)",
+                  "displayName": "売上金額",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "customer_type",
+                  "legend": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "年別売上推移（新規・既存）",
+                "showDescription": false,
+                "description": ""
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "97961476",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "customer_type",
+                      "expression": "`customer_type`"
+                    },
+                    {
+                      "name": "monthly(order_date)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `order_date`)"
+                    },
+                    {
+                      "name": "sum(subtotal)",
+                      "expression": "SUM(`subtotal`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(order_date)",
+                  "format": {
+                    "type": "date",
+                    "date": "year-month-day",
+                    "leadingZeros": true
+                  },
+                  "axis": {
+                    "labelAngle": 90
+                  },
+                  "displayName": "購買月",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(subtotal)",
+                  "displayName": "売上金額",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "customer_type",
+                  "legend": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "月別売上推移（新規・既存）",
+                "showDescription": false,
+                "description": ""
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 5,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "daf4b67f",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "rfm_segment",
+                      "expression": "`rfm_segment`"
+                    },
+                    {
+                      "name": "yearly(order_date)",
+                      "expression": "DATE_TRUNC(\"YEAR\", `order_date`)"
+                    },
+                    {
+                      "name": "sum(subtotal)",
+                      "expression": "SUM(`subtotal`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "yearly(order_date)",
+                  "format": {
+                    "type": "date",
+                    "date": "year-month-day",
+                    "leadingZeros": true
+                  },
+                  "axis": {
+                    "labelAngle": 90
+                  },
+                  "displayName": "購買月",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(subtotal)",
+                  "displayName": "売上金額",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "rfm_segment",
+                  "legend": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "月別売上推移（RFMセグメント）",
+                "showDescription": false
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "c7cc0fb2",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "rfm_segment",
+                      "expression": "`rfm_segment`"
+                    },
+                    {
+                      "name": "monthly(order_date)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `order_date`)"
+                    },
+                    {
+                      "name": "sum(subtotal)",
+                      "expression": "SUM(`subtotal`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(order_date)",
+                  "format": {
+                    "type": "date",
+                    "date": "year-month-day",
+                    "leadingZeros": true
+                  },
+                  "axis": {
+                    "labelAngle": 90
+                  },
+                  "displayName": "購買月",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(subtotal)",
+                  "displayName": "売上金額",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "rfm_segment",
+                  "legend": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "月別売上推移（RFMセグメント）",
+                "showDescription": false
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 10,
+            "width": 3,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "850df76b",
+      "displayName": "売上分析",
+      "layout": [
+        {
+          "widget": {
+            "name": "7fb1a03d",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## 売上分析"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "zenntai-no-uriage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "sum(subtotal)",
+                      "expression": "SUM(`subtotal`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(subtotal)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    },
+                    "significantFigures": {
+                      "type": "all"
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "売上金額"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "goumai-qikan",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_order_date",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "order_date",
+                      "expression": "`order_date`"
+                    },
+                    {
+                      "name": "order_date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "order_date",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_order_date"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "購買期間"
+              },
+              "selection": {
+                "defaultSelection": {
+                  "range": {
+                    "dataType": "DATE",
+                    "min": {
+                      "value": "now-1y/y"
+                    },
+                    "max": {
+                      "value": "now/y"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "tenpo-eria",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_store_area",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "store_area",
+                      "expression": "`store_area`"
+                    },
+                    {
+                      "name": "store_area_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "store_area",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_store_area"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "店舗エリア"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 1,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "zhu-wen-jian-shu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "countdistinct(order_id)",
+                      "expression": "COUNT(DISTINCT `order_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "countdistinct(order_id)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "注文件数"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 3,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kyakutanka",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "measure(客単価)",
+                      "expression": "MEASURE(`客単価`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(客単価)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    },
+                    "significantFigures": {
+                      "type": "exact",
+                      "figures": 3
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "客単価"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 3,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "nichibetsu-uriage-suii",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "customer_type",
+                      "expression": "`customer_type`"
+                    },
+                    {
+                      "name": "weekly(order_date)",
+                      "expression": "DATE_TRUNC(\"WEEK\", `order_date`)"
+                    },
+                    {
+                      "name": "sum(subtotal)",
+                      "expression": "SUM(`subtotal`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "weekly(order_date)",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(subtotal)",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "customer_type",
+                  "legend": {
+                    "hideTitle": true,
+                    "position": "right",
+                    "hide": false
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "週別売上推移"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "jikan-tai-x-youbi-betsu-uriage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "sum(subtotal)",
+                      "expression": "SUM(`subtotal`)"
+                    },
+                    {
+                      "name": "order_dayofweek_name",
+                      "expression": "`order_dayofweek_name`"
+                    },
+                    {
+                      "name": "time_period",
+                      "expression": "`time_period`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "order_dayofweek_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "time_period",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "sum(subtotal)",
+                  "displayName": "売上",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "show": false
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "時間帯 × 曜日ヒートマップ"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "kategori-betsu-uriage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "sum(subtotal)",
+                      "expression": "SUM(`subtotal`)"
+                    },
+                    {
+                      "name": "category_name",
+                      "expression": "`category_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "sum(subtotal)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "hideTitle": false,
+                    "title": "売上"
+                  }
+                },
+                "color": {
+                  "fieldName": "category_name",
+                  "legend": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "angle"
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "カテゴリ別売上"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 11,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "rfm-segment",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_rfm_segment",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "rfm_segment",
+                      "expression": "`rfm_segment`"
+                    },
+                    {
+                      "name": "rfm_segment_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "rfm_segment",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_rfm_segment"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "RFMセグメント"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "goumai-youbi",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_order_dayofweek_name",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "order_dayofweek_name",
+                      "expression": "`order_dayofweek_name`"
+                    },
+                    {
+                      "name": "order_dayofweek_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "order_dayofweek_name",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_order_dayofweek_name"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "曜日"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "9c4735a9",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f9a72779179c8afc6164b3f2baf0_store_name",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "store_name",
+                      "expression": "`store_name`"
+                    },
+                    {
+                      "name": "store_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "store_name",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f9a72779179c8afc6164b3f2baf0_store_name"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "店舗名"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 1,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "1cc34ffa",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_time_period",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "time_period",
+                      "expression": "`time_period`"
+                    },
+                    {
+                      "name": "time_period_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "time_period",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f90015ac1ca9bab3003150b3efc2_time_period"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "時間帯"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "e0edbb27",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4df6efb1",
+                  "fields": [
+                    {
+                      "name": "customer_type",
+                      "expression": "`customer_type`"
+                    },
+                    {
+                      "name": "order_dayofweek_name",
+                      "expression": "`order_dayofweek_name`"
+                    },
+                    {
+                      "name": "sum(subtotal)",
+                      "expression": "SUM(`subtotal`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "order_dayofweek_name",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(subtotal)",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "customer_type",
+                  "legend": {
+                    "hideTitle": true,
+                    "position": "right"
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": false
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "週別売上推移"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "04776c32",
+      "displayName": "顧客分析",
+      "layout": [
+        {
+          "widget": {
+            "name": "74e14982",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## 顧客分析"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "rfm-segment",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f8ffc8c71105af3a1ae96443fad0_rfm_segment",
+                "query": {
+                  "datasetName": "a2389636",
+                  "fields": [
+                    {
+                      "name": "rfm_segment",
+                      "expression": "`rfm_segment`"
+                    },
+                    {
+                      "name": "rfm_segment_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "rfm_segment",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f8ffc8c71105af3a1ae96443fad0_rfm_segment"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "RFMセグメント"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "kurastaa",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f8ffc8c71105af3a1ae96443fad0_behavior_cluster_name",
+                "query": {
+                  "datasetName": "a2389636",
+                  "fields": [
+                    {
+                      "name": "behavior_cluster_name",
+                      "expression": "`behavior_cluster_name`"
+                    },
+                    {
+                      "name": "behavior_cluster_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "behavior_cluster_name",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f8ffc8c71105af3a1ae96443fad0_behavior_cluster_name"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "クラスター"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 6,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "shinki-kizun",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f8ffc8c71105af3a1ae96443fad0_customer_type",
+                "query": {
+                  "datasetName": "a2389636",
+                  "fields": [
+                    {
+                      "name": "customer_type",
+                      "expression": "`customer_type`"
+                    },
+                    {
+                      "name": "customer_type_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "customer_type",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f8ffc8c71105af3a1ae96443fad0_customer_type"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "新規・既存"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 5,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "ripiito-sutetasu",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f9a7277917678c15721e57eb5535_email_permission_flg",
+                "query": {
+                  "datasetName": "a2389636",
+                  "fields": [
+                    {
+                      "name": "email_permission_flg",
+                      "expression": "`email_permission_flg`"
+                    },
+                    {
+                      "name": "email_permission_flg_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "email_permission_flg",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f9a7277917678c15721e57eb5535_email_permission_flg"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "メール許諾"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 6,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "rfm-segment-bunpu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a2389636",
+                  "fields": [
+                    {
+                      "name": "countdistinct(user_id)",
+                      "expression": "COUNT(DISTINCT `user_id`)"
+                    },
+                    {
+                      "name": "rfm_segment",
+                      "expression": "`rfm_segment`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "countdistinct(user_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "hideTitle": false,
+                    "title": "会員数"
+                  }
+                },
+                "color": {
+                  "fieldName": "rfm_segment",
+                  "legend": {
+                    "hide": false,
+                    "position": "right",
+                    "title": "RFMセグメント",
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "RFMセグメントの構成比"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 13,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "4ba95a2d",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a9df649a",
+                  "fields": [
+                    {
+                      "name": "decile_rank",
+                      "expression": "`decile_rank`"
+                    },
+                    {
+                      "name": "sum(monetary_sum)",
+                      "expression": "SUM(`monetary_sum`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "combo",
+              "encodings": {
+                "color": {
+                  "legend": {
+                    "hide": true,
+                    "hideTitle": false,
+                    "position": "right",
+                    "title": "デシルランク"
+                  }
+                },
+                "y": {
+                  "primary": {
+                    "fields": [
+                      {
+                        "fieldName": "sum(monetary_sum)"
+                      }
+                    ],
+                    "scale": {
+                      "type": "quantitative"
+                    },
+                    "axis": {
+                      "title": "売上"
+                    }
+                  },
+                  "secondary": {
+                    "fields": [],
+                    "scale": {
+                      "type": "quantitative"
+                    }
+                  }
+                },
+                "x": {
+                  "fieldName": "decile_rank",
+                  "displayName": "デシルランク",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "デシル分析"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 26,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "d487b96c",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a2389636",
+                  "fields": [
+                    {
+                      "name": "countdistinct(user_id)",
+                      "expression": "COUNT(DISTINCT `user_id`)"
+                    },
+                    {
+                      "name": "customer_type",
+                      "expression": "`customer_type`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "countdistinct(user_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "hideTitle": false,
+                    "title": "会員数"
+                  }
+                },
+                "color": {
+                  "fieldName": "customer_type",
+                  "legend": {
+                    "hide": false,
+                    "hideTitle": true,
+                    "position": "right"
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "新規・既存の構成比"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 7,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "f4df2bc7",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a9df649a",
+                  "fields": [
+                    {
+                      "name": "decile_rank",
+                      "expression": "`decile_rank`"
+                    },
+                    {
+                      "name": "customer_count",
+                      "expression": "`customer_count`"
+                    },
+                    {
+                      "name": "monetary_sum",
+                      "expression": "`monetary_sum`"
+                    },
+                    {
+                      "name": "contribution_pct",
+                      "expression": "`contribution_pct`"
+                    },
+                    {
+                      "name": "cumulative_pct",
+                      "expression": "`cumulative_pct`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "decile_rank",
+                    "numberFormat": "0",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100000,
+                    "title": "デシルランク",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "customer_count",
+                    "numberFormat": "0",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100001,
+                    "title": "会員数",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "monetary_sum",
+                    "numberFormat": "0",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100002,
+                    "title": "購買金額",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "contribution_pct",
+                    "numberFormat": "0.00",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100003,
+                    "title": "売上貢献(%)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "cumulative_pct",
+                    "numberFormat": "0.00",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100004,
+                    "title": "累計売上貢献(%)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  }
+                ]
+              },
+              "invisibleColumns": [],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": false,
+              "frame": {
+                "showTitle": true,
+                "title": "デシル分析・詳細"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 32,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "51b6bd2f",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### デシル分析"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 25,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "2936ef7b",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### RFMセグメント定義\n",
+                "\n",
+                "- **ロイヤル顧客**：R≥4 & F≥4 & M≥4（最近購入・高頻度・高単価の優良顧客）\n",
+                "- **常連顧客**：R≥4 & F≥3（最近購入があり、定期的に来店）\n",
+                "- **新規顧客**：R≥4 & F≤2（最近購入したが、まだ購入回数が少ない）\n",
+                "- **離脱リスク**：R≤2 & F≥3（以前は常連だったが、最近来店がない）\n",
+                "- **休眠顧客**：R≤2 & F≤2（購入頻度が低く、最近の来店もない）\n",
+                "- **一般顧客**：上記以外（中間的な購買行動）"
+              ]
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 1,
+            "width": 2,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "jujukenn",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f9a7277917678c15721e57eb5535_gender",
+                "query": {
+                  "datasetName": "a2389636",
+                  "fields": [
+                    {
+                      "name": "gender",
+                      "expression": "`gender`"
+                    },
+                    {
+                      "name": "gender_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "gender",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f9a7277917678c15721e57eb5535_gender"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "性別"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "ebd69822",
+            "queries": [
+              {
+                "name": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f9a7277917678c15721e57eb5535_pref",
+                "query": {
+                  "datasetName": "a2389636",
+                  "fields": [
+                    {
+                      "name": "pref",
+                      "expression": "`pref`"
+                    },
+                    {
+                      "name": "pref_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "pref",
+                    "queryName": "dashboards/01f0f8f5caaa1a4584f0754217eb4f87/datasets/01f0f9a7277917678c15721e57eb5535_pref"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "居住県"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 5,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "321e968e",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### クラスター定義\n",
+                "\n",
+                "- **週末まとめ買い族**：土日購入率≥80% & 平均購入点数≥10点（週末にまとめて買い物）\n",
+                "- **夜型値引きハンター**：19時以降購入率≥70% & 値引き商品率≥50%（夜に値引き品を狙う）\n",
+                "- **健康・こだわり層**：オーガニック/プレミアム商品率≥60%（品質重視の購買傾向）\n",
+                "- **カテゴリジャンキー**：特定カテゴリ購入率≥70%（酒類・菓子・スイーツに偏る）\n",
+                "- **平日夕方の時短族**：平日16-18時購入率≥70% & 即食系商品率≥60%（仕事帰りに手軽な食事を購入）\n",
+                "- **ランダム**：上記以外（特定の購買パターンなし）"
+              ]
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 1,
+            "width": 2,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "200813aa",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### 新規・既存ステータス定義\n",
+                "\n",
+                "- 新規：購入回数が1回のみ\n",
+                "- 既存：購入回数が2回以上"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 2,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "851d8b9a",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a2389636",
+                  "fields": [
+                    {
+                      "name": "countdistinct(user_id)",
+                      "expression": "COUNT(DISTINCT `user_id`)"
+                    },
+                    {
+                      "name": "behavior_cluster_name",
+                      "expression": "`behavior_cluster_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "countdistinct(user_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "hideTitle": false,
+                    "title": "会員数"
+                  }
+                },
+                "color": {
+                  "fieldName": "behavior_cluster_name",
+                  "legend": {
+                    "hideTitle": true,
+                    "position": "right"
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "クラスターの構成比"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 19,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "1b84c3ac",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a2389636",
+                  "fields": [
+                    {
+                      "name": "email_permission_flg",
+                      "expression": "`email_permission_flg`"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    },
+                    {
+                      "name": "behavior_cluster_name",
+                      "expression": "`behavior_cluster_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "count(*)",
+                  "axis": {
+                    "title": "会員数"
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "behavior_cluster_name",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "email_permission_flg",
+                  "legend": {
+                    "title": "メール許諾",
+                    "position": "right",
+                    "hide": false
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "クラスターのメール許諾状況"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 19,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "dc61e2e2",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a2389636",
+                  "fields": [
+                    {
+                      "name": "email_permission_flg",
+                      "expression": "`email_permission_flg`"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    },
+                    {
+                      "name": "customer_type",
+                      "expression": "`customer_type`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "count(*)",
+                  "axis": {
+                    "title": "会員数"
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "customer_type",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "email_permission_flg",
+                  "legend": {
+                    "title": "メール許諾",
+                    "position": "right",
+                    "hide": false
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "新規・既存のメール許諾状況"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 7,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "68c6e4a0",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a2389636",
+                  "fields": [
+                    {
+                      "name": "email_permission_flg",
+                      "expression": "`email_permission_flg`"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    },
+                    {
+                      "name": "rfm_segment",
+                      "expression": "`rfm_segment`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "count(*)",
+                  "axis": {
+                    "title": "会員数"
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "rfm_segment",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "email_permission_flg",
+                  "legend": {
+                    "title": "メール許諾",
+                    "position": "right",
+                    "hide": false
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "RFMセグメントのメール許諾状況"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 13,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "genieSpace": {
+      "isEnabled": true,
+      "overrideId": "01f0f95045c21588899141d671c760c4",
+      "enablementMode": "ENABLED"
+    },
+    "applyModeEnabled": false
+  }
+}
