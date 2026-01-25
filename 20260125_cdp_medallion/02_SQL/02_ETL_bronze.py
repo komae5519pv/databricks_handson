@@ -33,6 +33,7 @@ print("\n既存のBronzeテーブルを全て削除しました。")
 spark.sql(f"""
     CREATE TABLE IF NOT EXISTS {MY_CATALOG}.{MY_SCHEMA}.bz_users
     USING DELTA
+    -- テーブルの変更データフィード（CDF）を有効化
     TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
 """)
 
@@ -49,6 +50,7 @@ spark.sql(f"""
 spark.sql(f"""
     CREATE OR REPLACE TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_users
     USING DELTA
+    -- テーブルの変更データフィード（CDF）を有効化
     TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
     AS
     SELECT
@@ -73,6 +75,7 @@ print(f"bz_users: {cnt}件")
 spark.sql(f"""
     CREATE TABLE IF NOT EXISTS {MY_CATALOG}.{MY_SCHEMA}.bz_items
     USING DELTA
+    -- テーブルの変更データフィード（CDF）を有効化
     TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
 """)
 
@@ -89,6 +92,7 @@ spark.sql(f"""
 spark.sql(f"""
     CREATE OR REPLACE TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_items
     USING DELTA
+    -- テーブルの変更データフィード（CDF）を有効化
     TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
     AS
     SELECT
@@ -113,6 +117,7 @@ print(f"bz_items: {cnt}件")
 spark.sql(f"""
     CREATE TABLE IF NOT EXISTS {MY_CATALOG}.{MY_SCHEMA}.bz_stores
     USING DELTA
+    -- テーブルの変更データフィード（CDF）を有効化
     TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
 """)
 
@@ -129,6 +134,7 @@ spark.sql(f"""
 spark.sql(f"""
     CREATE OR REPLACE TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_stores
     USING DELTA
+    -- テーブルの変更データフィード（CDF）を有効化
     TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
     AS
     SELECT
@@ -153,6 +159,7 @@ print(f"bz_stores: {cnt}件")
 spark.sql(f"""
     CREATE TABLE IF NOT EXISTS {MY_CATALOG}.{MY_SCHEMA}.bz_orders
     USING DELTA
+    -- テーブルの変更データフィード（CDF）を有効化
     TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
 """)
 
@@ -169,6 +176,7 @@ spark.sql(f"""
 spark.sql(f"""
     CREATE OR REPLACE TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_orders
     USING DELTA
+    -- テーブルの変更データフィード（CDF）を有効化
     TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
     AS
     SELECT
@@ -193,6 +201,7 @@ print(f"bz_orders: {cnt}件")
 spark.sql(f"""
     CREATE TABLE IF NOT EXISTS {MY_CATALOG}.{MY_SCHEMA}.bz_order_items
     USING DELTA
+    -- テーブルの変更データフィード（CDF）を有効化
     TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
 """)
 
@@ -209,6 +218,7 @@ spark.sql(f"""
 spark.sql(f"""
     CREATE OR REPLACE TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_order_items
     USING DELTA
+    -- テーブルの変更データフィード（CDF）を有効化
     TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
     AS
     SELECT
