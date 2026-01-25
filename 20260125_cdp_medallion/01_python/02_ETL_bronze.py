@@ -35,7 +35,7 @@ print("\n既存のBronzeテーブルを全て削除しました。")
 # COMMAND ----------
 
 # DBTITLE 1,bz_usersの作成
-# マスタデータ: PySpark DataFrameで読み込み + CDF有効化
+# マスタデータ: PySpark DataFrameで読み込み
 # CSVを読み込み
 df = spark.read.format("csv") \
     .option("header", "true") \
@@ -52,9 +52,6 @@ df_with_audit.write.format("delta") \
     .option("overwriteSchema", "true") \
     .saveAsTable(f"{MY_CATALOG}.{MY_SCHEMA}.bz_users")
 
-# テーブルの変更データフィード（CDF）を有効化
-spark.sql(f"ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_users SET TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')")
-
 print(f"bz_users: {df_with_audit.count()}件")
 
 # COMMAND ----------
@@ -65,7 +62,7 @@ print(f"bz_users: {df_with_audit.count()}件")
 # COMMAND ----------
 
 # DBTITLE 1,bz_itemsの作成
-# マスタデータ: PySpark DataFrameで読み込み + CDF有効化
+# マスタデータ: PySpark DataFrameで読み込み
 # CSVを読み込み
 df = spark.read.format("csv") \
     .option("header", "true") \
@@ -82,9 +79,6 @@ df_with_audit.write.format("delta") \
     .option("overwriteSchema", "true") \
     .saveAsTable(f"{MY_CATALOG}.{MY_SCHEMA}.bz_items")
 
-# テーブルの変更データフィード（CDF）を有効化
-spark.sql(f"ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_items SET TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')")
-
 print(f"bz_items: {df_with_audit.count()}件")
 
 # COMMAND ----------
@@ -95,7 +89,7 @@ print(f"bz_items: {df_with_audit.count()}件")
 # COMMAND ----------
 
 # DBTITLE 1,bz_storesの作成
-# マスタデータ: PySpark DataFrameで読み込み + CDF有効化
+# マスタデータ: PySpark DataFrameで読み込み
 # CSVを読み込み
 df = spark.read.format("csv") \
     .option("header", "true") \
@@ -111,9 +105,6 @@ df_with_audit.write.format("delta") \
     .mode("overwrite") \
     .option("overwriteSchema", "true") \
     .saveAsTable(f"{MY_CATALOG}.{MY_SCHEMA}.bz_stores")
-
-# テーブルの変更データフィード（CDF）を有効化
-spark.sql(f"ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_stores SET TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')")
 
 print(f"bz_stores: {df_with_audit.count()}件")
 

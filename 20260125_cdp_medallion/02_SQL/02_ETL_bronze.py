@@ -29,12 +29,10 @@ print("\n既存のBronzeテーブルを全て削除しました。")
 # COMMAND ----------
 
 # DBTITLE 1,bz_usersの作成
-# マスタデータ: read_filesで一括取り込み + CDF有効化
+# マスタデータ: read_filesで一括取り込み
 spark.sql(f"""
     CREATE OR REPLACE TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_users
     USING DELTA
-    -- テーブルの変更データフィード（CDF）を有効化
-    TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
     AS
     SELECT
         *,
@@ -58,12 +56,10 @@ print(f"bz_users: {cnt}件")
 # COMMAND ----------
 
 # DBTITLE 1,bz_itemsの作成
-# マスタデータ: read_filesで一括取り込み + CDF有効化
+# マスタデータ: read_filesで一括取り込み
 spark.sql(f"""
     CREATE OR REPLACE TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_items
     USING DELTA
-    -- テーブルの変更データフィード（CDF）を有効化
-    TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
     AS
     SELECT
         *,
@@ -87,12 +83,10 @@ print(f"bz_items: {cnt}件")
 # COMMAND ----------
 
 # DBTITLE 1,bz_storesの作成
-# マスタデータ: read_filesで一括取り込み + CDF有効化
+# マスタデータ: read_filesで一括取り込み
 spark.sql(f"""
     CREATE OR REPLACE TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_stores
     USING DELTA
-    -- テーブルの変更データフィード（CDF）を有効化
-    TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
     AS
     SELECT
         *,
