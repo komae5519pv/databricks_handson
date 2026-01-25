@@ -30,7 +30,7 @@
 
 # COMMAND ----------
 
-# MAGIC %run ./00_config
+# %run ../00_config
 
 # COMMAND ----------
 
@@ -67,6 +67,10 @@ DATA_DAYS = DATA_YEARS * 365  # データ期間（日数）= 1825日
 
 print(f"基準日（最終購買日の最大値）: {BASE_DATE}")
 print(f"データ期間: {DATA_YEARS}年間（{DATA_DAYS}日）")
+
+# COMMAND ----------
+
+print('サンプルデータ生成を開始します！')
 
 # COMMAND ----------
 
@@ -2058,6 +2062,10 @@ for row in monthly_sales:
     elif m == 8:
         seasonal_note = " ← お盆（期待: +15-20%）"
     print(f"{m:2d}月: {sales:>15,}円 (平均比 {ratio:.2f}倍){seasonal_note}")
+
+# COMMAND ----------
+
+print('サンプルデータ生成が完了しました！')
 
 # COMMAND ----------
 
