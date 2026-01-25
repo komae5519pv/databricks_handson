@@ -35,29 +35,25 @@ print("\n既存のBronzeテーブルを全て削除しました。")
 # COMMAND ----------
 
 # DBTITLE 1,bz_usersの作成
-# テーブル作成
-spark.sql(f"""
-    CREATE TABLE IF NOT EXISTS {MY_CATALOG}.{MY_SCHEMA}.bz_users
-    USING DELTA
-    -- テーブルの変更データフィード（CDF）を有効化
-    TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
-""")
-
-# CSVデータを取り込み
-spark.sql(f"""
-    COPY INTO {MY_CATALOG}.{MY_SCHEMA}.bz_users
-    FROM '/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/users'
-    FILEFORMAT = CSV
-    FORMAT_OPTIONS ('header' = 'true', 'inferSchema' = 'false')
-    COPY_OPTIONS ('mergeSchema' = 'true')
-""")
+# マスタデータ: PySpark DataFrameで読み込み + CDF有効化
+# CSVを読み込み
+df = spark.read.format("csv") \
+    .option("header", "true") \
+    .load(f"/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/users")
 
 # 監査カラムを追加
-df = spark.table(f"{MY_CATALOG}.{MY_SCHEMA}.bz_users")
 df_with_audit = df \
     .withColumn("_ingested_at", current_timestamp()) \
     .withColumn("_source_file", lit(f"/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/users"))
-df_with_audit.write.mode("overwrite").option("overwriteSchema", "true").format("delta").saveAsTable(f"{MY_CATALOG}.{MY_SCHEMA}.bz_users")
+
+# テーブルとして保存
+df_with_audit.write.format("delta") \
+    .mode("overwrite") \
+    .option("overwriteSchema", "true") \
+    .saveAsTable(f"{MY_CATALOG}.{MY_SCHEMA}.bz_users")
+
+# テーブルの変更データフィード（CDF）を有効化
+spark.sql(f"ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_users SET TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')")
 
 print(f"bz_users: {df_with_audit.count()}件")
 
@@ -69,29 +65,25 @@ print(f"bz_users: {df_with_audit.count()}件")
 # COMMAND ----------
 
 # DBTITLE 1,bz_itemsの作成
-# テーブル作成
-spark.sql(f"""
-    CREATE TABLE IF NOT EXISTS {MY_CATALOG}.{MY_SCHEMA}.bz_items
-    USING DELTA
-    -- テーブルの変更データフィード（CDF）を有効化
-    TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
-""")
-
-# CSVデータを取り込み
-spark.sql(f"""
-    COPY INTO {MY_CATALOG}.{MY_SCHEMA}.bz_items
-    FROM '/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/items'
-    FILEFORMAT = CSV
-    FORMAT_OPTIONS ('header' = 'true', 'inferSchema' = 'false')
-    COPY_OPTIONS ('mergeSchema' = 'true')
-""")
+# マスタデータ: PySpark DataFrameで読み込み + CDF有効化
+# CSVを読み込み
+df = spark.read.format("csv") \
+    .option("header", "true") \
+    .load(f"/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/items")
 
 # 監査カラムを追加
-df = spark.table(f"{MY_CATALOG}.{MY_SCHEMA}.bz_items")
 df_with_audit = df \
     .withColumn("_ingested_at", current_timestamp()) \
     .withColumn("_source_file", lit(f"/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/items"))
-df_with_audit.write.mode("overwrite").option("overwriteSchema", "true").format("delta").saveAsTable(f"{MY_CATALOG}.{MY_SCHEMA}.bz_items")
+
+# テーブルとして保存
+df_with_audit.write.format("delta") \
+    .mode("overwrite") \
+    .option("overwriteSchema", "true") \
+    .saveAsTable(f"{MY_CATALOG}.{MY_SCHEMA}.bz_items")
+
+# テーブルの変更データフィード（CDF）を有効化
+spark.sql(f"ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_items SET TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')")
 
 print(f"bz_items: {df_with_audit.count()}件")
 
@@ -103,29 +95,25 @@ print(f"bz_items: {df_with_audit.count()}件")
 # COMMAND ----------
 
 # DBTITLE 1,bz_storesの作成
-# テーブル作成
-spark.sql(f"""
-    CREATE TABLE IF NOT EXISTS {MY_CATALOG}.{MY_SCHEMA}.bz_stores
-    USING DELTA
-    -- テーブルの変更データフィード（CDF）を有効化
-    TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
-""")
-
-# CSVデータを取り込み
-spark.sql(f"""
-    COPY INTO {MY_CATALOG}.{MY_SCHEMA}.bz_stores
-    FROM '/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/stores'
-    FILEFORMAT = CSV
-    FORMAT_OPTIONS ('header' = 'true', 'inferSchema' = 'false')
-    COPY_OPTIONS ('mergeSchema' = 'true')
-""")
+# マスタデータ: PySpark DataFrameで読み込み + CDF有効化
+# CSVを読み込み
+df = spark.read.format("csv") \
+    .option("header", "true") \
+    .load(f"/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/stores")
 
 # 監査カラムを追加
-df = spark.table(f"{MY_CATALOG}.{MY_SCHEMA}.bz_stores")
 df_with_audit = df \
     .withColumn("_ingested_at", current_timestamp()) \
     .withColumn("_source_file", lit(f"/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/stores"))
-df_with_audit.write.mode("overwrite").option("overwriteSchema", "true").format("delta").saveAsTable(f"{MY_CATALOG}.{MY_SCHEMA}.bz_stores")
+
+# テーブルとして保存
+df_with_audit.write.format("delta") \
+    .mode("overwrite") \
+    .option("overwriteSchema", "true") \
+    .saveAsTable(f"{MY_CATALOG}.{MY_SCHEMA}.bz_stores")
+
+# テーブルの変更データフィード（CDF）を有効化
+spark.sql(f"ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_stores SET TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')")
 
 print(f"bz_stores: {df_with_audit.count()}件")
 
@@ -133,66 +121,68 @@ print(f"bz_stores: {df_with_audit.count()}件")
 
 # MAGIC %md
 # MAGIC ## bz_orders
+# MAGIC COPY INTOの「処理済みファイルを追跡して増分取り込み」機能のPySpark直接対応がないため、SQLベースで記述します。
+# MAGIC AutoLoaderであればPySpark APIで対応可能ですが、複雑なためここでは実装しません。
 
 # COMMAND ----------
 
 # DBTITLE 1,bz_ordersの作成
-# テーブル作成
+# トランザクションデータ: COPY INTOで増分取り込み（PySpark APIでは不可）
+# 空テーブル作成（COPY INTOのため）
 spark.sql(f"""
     CREATE TABLE IF NOT EXISTS {MY_CATALOG}.{MY_SCHEMA}.bz_orders
     USING DELTA
-    -- テーブルの変更データフィード（CDF）を有効化
-    TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
 """)
 
-# CSVデータを取り込み
+# CSVデータを増分取り込み（監査列はSELECTで付与）
 spark.sql(f"""
     COPY INTO {MY_CATALOG}.{MY_SCHEMA}.bz_orders
-    FROM '/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/orders'
+    FROM (
+        SELECT
+            *,
+            current_timestamp() AS _ingested_at,                                        -- 取り込み日時
+            '/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/orders' AS _source_file      -- ソースファイルパス
+        FROM '/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/orders'
+    )
     FILEFORMAT = CSV
     FORMAT_OPTIONS ('header' = 'true', 'inferSchema' = 'false')
     COPY_OPTIONS ('mergeSchema' = 'true')
 """)
 
-# 監査カラムを追加
-df = spark.table(f"{MY_CATALOG}.{MY_SCHEMA}.bz_orders")
-df_with_audit = df \
-    .withColumn("_ingested_at", current_timestamp()) \
-    .withColumn("_source_file", lit(f"/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/orders"))
-df_with_audit.write.mode("overwrite").option("overwriteSchema", "true").format("delta").saveAsTable(f"{MY_CATALOG}.{MY_SCHEMA}.bz_orders")
-
-print(f"bz_orders: {df_with_audit.count()}件")
+cnt = spark.sql(f"SELECT COUNT(*) AS cnt FROM {MY_CATALOG}.{MY_SCHEMA}.bz_orders").collect()[0]["cnt"]
+print(f"bz_orders: {cnt}件")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## bz_order_items
+# MAGIC COPY INTOの「処理済みファイルを追跡して増分取り込み」機能のPySpark直接対応がないため、SQLベースで記述します。
+# MAGIC AutoLoaderであればPySpark APIで対応可能ですが、複雑なためここでは実装しません。
 
 # COMMAND ----------
 
 # DBTITLE 1,bz_order_itemsの作成
-# テーブル作成
+# トランザクションデータ: COPY INTOで増分取り込み（PySpark APIでは不可）
+# 空テーブル作成（COPY INTOのため）
 spark.sql(f"""
     CREATE TABLE IF NOT EXISTS {MY_CATALOG}.{MY_SCHEMA}.bz_order_items
     USING DELTA
-    -- テーブルの変更データフィード（CDF）を有効化
-    TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
 """)
 
-# CSVデータを取り込み
+# CSVデータを増分取り込み（監査列はSELECTで付与）
 spark.sql(f"""
     COPY INTO {MY_CATALOG}.{MY_SCHEMA}.bz_order_items
-    FROM '/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/order_items'
+    FROM (
+        SELECT
+            *,
+            current_timestamp() AS _ingested_at,                                            -- 取り込み日時
+            '/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/order_items' AS _source_file     -- ソースファイルパス
+        FROM '/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/order_items'
+    )
     FILEFORMAT = CSV
     FORMAT_OPTIONS ('header' = 'true', 'inferSchema' = 'false')
     COPY_OPTIONS ('mergeSchema' = 'true')
 """)
 
-# 監査カラムを追加
-df = spark.table(f"{MY_CATALOG}.{MY_SCHEMA}.bz_order_items")
-df_with_audit = df \
-    .withColumn("_ingested_at", current_timestamp()) \
-    .withColumn("_source_file", lit(f"/Volumes/{MY_CATALOG}/{MY_SCHEMA}/{MY_VOLUME}/order_items"))
-df_with_audit.write.mode("overwrite").option("overwriteSchema", "true").format("delta").saveAsTable(f"{MY_CATALOG}.{MY_SCHEMA}.bz_order_items")
-
-print(f"bz_order_items: {df_with_audit.count()}件")
+cnt = spark.sql(f"SELECT COUNT(*) AS cnt FROM {MY_CATALOG}.{MY_SCHEMA}.bz_order_items").collect()[0]["cnt"]
+print(f"bz_order_items: {cnt}件")
