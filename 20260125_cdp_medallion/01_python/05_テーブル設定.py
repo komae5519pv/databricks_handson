@@ -190,46 +190,46 @@ print(f"✅ {table_name} のコメント設定完了")
 # COMMAND ----------
 
 # DBTITLE 1,列レベルマスキングの追加
-# Bronze層の個人情報カラムにマスキングを適用
+# 各層の個人情報カラムに列レベルマスキングを適用
 # 対象: email（メールアドレス）, phone_number（電話番号）, name（氏名）
 
 # ============================================================
-# 【参考】特定グループのみマスク解除する場合の書き方
+# 1. マスキング関数の定義と Bronze層 (bz_users) への適用
 # ============================================================
 try:
-    # --- メールアドレスのマスキング ---
+    '''メールアドレス用関数の作成と適用'''
     spark.sql(f"""
     CREATE OR REPLACE FUNCTION {MY_CATALOG}.{MY_SCHEMA}.mask_email(email STRING)
-    -- RETURN CASE WHEN is_member('admins') THEN email ELSE '***@example.com' END
     RETURN '***@example.com'
     """)
     spark.sql(f"""
     ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_users ALTER COLUMN email SET MASK {MY_CATALOG}.{MY_SCHEMA}.mask_email
     """)
 
-    # --- 電話番号のマスキング ---
+    '''電話番号用関数の作成と適用'''
     spark.sql(f"""
     CREATE OR REPLACE FUNCTION {MY_CATALOG}.{MY_SCHEMA}.mask_phone(phone STRING)
-    -- RETURN CASE WHEN is_member('admins') THEN phone ELSE '***-****-****' END
     RETURN '***-****-****'
     """)
     spark.sql(f"""
     ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_users ALTER COLUMN phone_number SET MASK {MY_CATALOG}.{MY_SCHEMA}.mask_phone
     """)
 
-    # --- 氏名のマスキング ---
+    '''氏名用関数の作成と適用'''
     spark.sql(f"""
     CREATE OR REPLACE FUNCTION {MY_CATALOG}.{MY_SCHEMA}.mask_name(name STRING)
-    -- RETURN CASE WHEN is_member('admins') THEN name ELSE '****' END
     RETURN '****'
     """)
     spark.sql(f"""
     ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.bz_users ALTER COLUMN name SET MASK {MY_CATALOG}.{MY_SCHEMA}.mask_name
     """)
 
-    print("✅ Bronze層の列レベルマスキング適用完了（bz_users.email, phone_number, name）")
+    print("✅ Bronze層の列レベルマスキング適用完了（bz_users: email, phone_number, name）")
 
-    # --- Silver層 (sl_users) へのマスク適用 ---
+    # ============================================================
+    # 2. Silver層 (sl_users) への適用
+    # ============================================================
+    # すでに定義済みのマスキング関数を Silver層のテーブルにも紐付けます
     spark.sql(f"""
     ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.sl_users ALTER COLUMN email SET MASK {MY_CATALOG}.{MY_SCHEMA}.mask_email
     """)
@@ -239,9 +239,12 @@ try:
     spark.sql(f"""
     ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.sl_users ALTER COLUMN name SET MASK {MY_CATALOG}.{MY_SCHEMA}.mask_name
     """)
-    print("✅ Silver層の列レベルマスキング適用完了（sl_users.email, phone_number, name）")
+    print("✅ Silver層の列レベルマスキング適用完了（sl_users: email, phone_number, name）")
 
-    # --- Gold層 (gd_users) へのマスク適用 ---
+    # ============================================================
+    # 3. Gold層 (gd_users) への適用
+    # ============================================================
+    # すでに定義済みのマスキング関数を Gold層のテーブルにも紐付けます
     spark.sql(f"""
     ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_users ALTER COLUMN email SET MASK {MY_CATALOG}.{MY_SCHEMA}.mask_email
     """)
@@ -251,11 +254,11 @@ try:
     spark.sql(f"""
     ALTER TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_users ALTER COLUMN name SET MASK {MY_CATALOG}.{MY_SCHEMA}.mask_name
     """)
-    print("✅ Gold層の列レベルマスキング適用完了（gd_users.email, phone_number, name）")
+    print("✅ Gold層の列レベルマスキング適用完了（gd_users: email, phone_number, name）")
 
 except Exception as e:
     print(f"⚠️ 列レベルマスキングの適用中にエラーが発生しました: {str(e)}")
-    print("このエラーはDBR 15.4より前のバージョンで実行している場合に発生する可能性があります。")
+    print("ヒント: カラム名が正しいか、またはDBRのバージョンが列レベルマスキングをサポートしているか確認してください。")
 
 # COMMAND ----------
 
