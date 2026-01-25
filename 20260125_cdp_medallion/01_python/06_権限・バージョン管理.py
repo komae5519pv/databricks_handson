@@ -16,21 +16,21 @@
 
 # DBTITLE 1,現在の権限を確認
 # カタログレベルの権限を確認
-print(f"📋 カタログ '{MY_CATALOG}' の権限一覧:")
+print(f"カタログ '{MY_CATALOG}' の権限一覧:")
 display(spark.sql(f"SHOW GRANTS ON CATALOG {MY_CATALOG}"))
 
 # COMMAND ----------
 
 # DBTITLE 1,スキーマレベルの権限を確認
 # スキーマレベルの権限を確認
-print(f"📋 スキーマ '{MY_CATALOG}.{MY_SCHEMA}' の権限一覧:")
+print(f"スキーマ '{MY_CATALOG}.{MY_SCHEMA}' の権限一覧:")
 display(spark.sql(f"SHOW GRANTS ON SCHEMA {MY_CATALOG}.{MY_SCHEMA}"))
 
 # COMMAND ----------
 
 # DBTITLE 1,テーブルレベルの権限を確認
 # Goldテーブルの権限を確認
-print(f"📋 テーブル 'gd_orders' の権限一覧:")
+print(f"テーブル 'gd_orders' の権限一覧:")
 display(spark.sql(f"SHOW GRANTS ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_orders"))
 
 # COMMAND ----------
@@ -93,7 +93,7 @@ display(spark.sql(f"SHOW GRANTS ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_orders"))
 # spark.sql(f"GRANT SELECT ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_orders TO `analyst@example.com`")
 # spark.sql(f"GRANT SELECT ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_order_items TO `analyst@example.com`")
 
-# print("✅ 権限を付与しました")
+# print("権限を付与しました")
 
 # COMMAND ----------
 
@@ -115,7 +115,7 @@ display(spark.sql(f"SHOW GRANTS ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_orders"))
 # spark.sql(f"GRANT SELECT ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_orders TO `data_analysts`")
 # spark.sql(f"GRANT SELECT ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_order_items TO `data_analysts`")
 
-# print("✅ グループ 'data_analysts' に権限を付与しました")
+# print("グループ 'data_analysts' に権限を付与しました")
 
 # COMMAND ----------
 
@@ -130,7 +130,7 @@ display(spark.sql(f"SHOW GRANTS ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_orders"))
 # spark.sql(f"REVOKE SELECT ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_orders FROM `analyst@example.com`")
 # spark.sql(f"REVOKE SELECT ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_order_items FROM `analyst@example.com`")
 
-# print("✅ ユーザーから権限を剥奪しました")
+# print("ユーザーから権限を剥奪しました")
 
 # COMMAND ----------
 
@@ -145,7 +145,7 @@ display(spark.sql(f"SHOW GRANTS ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_orders"))
 # spark.sql(f"REVOKE SELECT ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_orders FROM `data_analysts`")
 # spark.sql(f"REVOKE SELECT ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_order_items FROM `data_analysts`")
 
-# print("✅ グループ 'data_analysts' から権限を剥奪しました")
+# print("グループ 'data_analysts' から権限を剥奪しました")
 
 # COMMAND ----------
 
@@ -157,56 +157,64 @@ display(spark.sql(f"SHOW GRANTS ON TABLE {MY_CATALOG}.{MY_SCHEMA}.gd_orders"))
 # DBTITLE 1,更新対象テーブルの設定
 # 更新対象テーブル（Silver層の注文テーブルを使用）
 target_table = f"{MY_CATALOG}.{MY_SCHEMA}.sl_orders"
-print(f"📌 更新対象テーブル: {target_table}")
+print(f"更新対象テーブル: {target_table}")
+
+# 更新対象のorder_idを取得（テーブル内の最小order_id）
+target_order_id = spark.sql(f"SELECT MIN(order_id) AS min_id FROM {target_table}").collect()[0]["min_id"]
+print(f"更新対象のorder_id: {target_order_id}")
 
 # COMMAND ----------
 
 # DBTITLE 1,更新前のデータを確認
-# 更新対象のレコードを確認（最初の注文を対象とする）
-print("📋 更新前のデータ（order_id = 1）:")
+# 更新対象のレコードを確認
+print(f"更新前のデータ（order_id = {target_order_id}）:")
 display(spark.sql(f"""
-SELECT order_id, user_id, store_name, total_amount, order_status, order_datetime
-FROM {target_table}
-WHERE order_id = 1
+    SELECT order_id, user_id, store_name, total_amount, order_status, order_datetime
+    FROM {target_table}
+    WHERE order_id = {target_order_id}
 """))
 
 # COMMAND ----------
 
 # DBTITLE 1,データ更新の実行
 # 更新前のバージョンを記録
-current_version = spark.sql(f"SELECT MAX(version) FROM (DESCRIBE HISTORY {target_table})").collect()[0][0]
-print(f"📝 更新前のバージョン: {current_version}")
+current_version = spark.sql(f"""
+    SELECT MAX(version) AS ver FROM (DESCRIBE HISTORY {target_table})
+""").collect()[0]["ver"]
+print(f"更新前のバージョン: {current_version}")
 
 # 特定の注文のステータスを更新
-print("🔄 データを更新中...")
+print("データを更新中...")
 spark.sql(f"""
-UPDATE {target_table}
-SET order_status = 'updated_for_demo'
-WHERE order_id = 1
+    UPDATE {target_table}
+    SET order_status = '！テスト更新！'
+    WHERE order_id = {target_order_id}
 """)
 
-print("✅ order_id=1 のorder_statusを 'updated_for_demo' に更新しました")
+print(f"order_id={target_order_id} のorder_statusを 'テスト更新！' に更新しました")
 
 # 更新後のバージョンを確認
-new_version = spark.sql(f"SELECT MAX(version) FROM (DESCRIBE HISTORY {target_table})").collect()[0][0]
-print(f"🔄 バージョンが {current_version} → {new_version} に更新されました")
+new_version = spark.sql(f"""
+    SELECT MAX(version) AS ver FROM (DESCRIBE HISTORY {target_table})
+""").collect()[0]["ver"]
+print(f"バージョンが {current_version} → {new_version} に更新されました")
 
 # COMMAND ----------
 
 # DBTITLE 1,更新後のデータを確認
 # 更新後のレコードを確認
-print("📋 更新後のデータ（order_id = 1）:")
+print(f"更新後のデータ（order_id = {target_order_id}）:")
 display(spark.sql(f"""
-SELECT order_id, user_id, store_name, total_amount, order_status, order_datetime
-FROM {target_table}
-WHERE order_id = 1
+    SELECT order_id, user_id, store_name, total_amount, order_status, order_datetime
+    FROM {target_table}
+    WHERE order_id = {target_order_id}
 """))
 
 # COMMAND ----------
 
 # DBTITLE 1,テーブルの変更履歴を確認
 # Delta Lakeの変更履歴（DESCRIBE HISTORY）を確認
-print(f"📜 テーブル '{target_table}' の変更履歴:")
+print(f"テーブル '{target_table}' の変更履歴:")
 display(spark.sql(f"DESCRIBE HISTORY {target_table}"))
 
 # COMMAND ----------
@@ -217,29 +225,27 @@ display(spark.sql(f"DESCRIBE HISTORY {target_table}"))
 # COMMAND ----------
 
 # DBTITLE 1,Time Travelでのデータ確認
-print(f"⏰ Time Travel: バージョン{current_version}（更新前）のデータを確認")
-time_travel_df = spark.sql(f"""
-SELECT order_id, user_id, store_name, total_amount, order_status, order_datetime
-FROM {target_table} VERSION AS OF {current_version}
-WHERE order_id = 1
-""")
-display(time_travel_df)
+print(f"Time Travel: バージョン{current_version}（更新前）のデータを確認")
+display(spark.sql(f"""
+    SELECT order_id, user_id, store_name, total_amount, order_status, order_datetime
+    FROM {target_table} VERSION AS OF {current_version}
+    WHERE order_id = {target_order_id}
+"""))
 
-print(f"⏰ 現在のバージョン{new_version}（更新後）のデータを確認")
-current_df = spark.sql(f"""
-SELECT order_id, user_id, store_name, total_amount, order_status, order_datetime
-FROM {target_table}
-WHERE order_id = 1
-""")
-display(current_df)
+print(f"現在のバージョン{new_version}（更新後）のデータを確認")
+display(spark.sql(f"""
+    SELECT order_id, user_id, store_name, total_amount, order_status, order_datetime
+    FROM {target_table}
+    WHERE order_id = {target_order_id}
+"""))
 
-print("🎉 Time Travelにより、過去のバージョンのデータを参照できました！")
+print("Time Travelにより、過去のバージョンのデータを参照できました！")
 
 # COMMAND ----------
 
 # DBTITLE 1,タイムスタンプでのTime Travel
 # タイムスタンプを使ったTime Travelも可能
-print("📅 タイムスタンプでのTime Travel例:")
+print("タイムスタンプでのTime Travel例:")
 print("""
 -- 特定の日時時点のデータを取得
 SELECT * FROM <table_name> TIMESTAMP AS OF '2024-01-01 00:00:00'
@@ -252,48 +258,21 @@ SELECT * FROM <table_name> TIMESTAMP AS OF current_timestamp() - INTERVAL 1 HOUR
 
 # DBTITLE 1,データを元に戻す（RESTORE）
 # 更新前のバージョンに戻す
-print(f"🔙 バージョン{current_version}（更新前）にデータを復元中...")
+print(f"バージョン{current_version}（更新前）にデータを復元中...")
 spark.sql(f"RESTORE {target_table} TO VERSION AS OF {current_version}")
+print(f"RESTORE {target_table} TO VERSION AS OF {current_version}")
 
 # 復元後のデータを確認
-print("📋 復元後のデータ（order_id = 1）:")
+print(f"復元後のデータ（order_id = {target_order_id}）:")
 display(spark.sql(f"""
-SELECT order_id, user_id, store_name, total_amount, order_status, order_datetime
-FROM {target_table}
-WHERE order_id = 1
+    SELECT order_id, user_id, store_name, total_amount, order_status, order_datetime
+    FROM {target_table}
+    WHERE order_id = {target_order_id}
 """))
 
 # 復元後のバージョンを確認
-restored_version = spark.sql(f"SELECT MAX(version) FROM (DESCRIBE HISTORY {target_table})").collect()[0][0]
-print(f"✅ データを復元しました（現在のバージョン: {restored_version}）")
-print("🎉 RESTOREにより、過去のバージョンにデータを戻すことができました！")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## まとめ
-
-# COMMAND ----------
-
-# DBTITLE 1,完了メッセージ
-print("=" * 60)
-print("権限・バージョン管理の設定完了")
-print("=" * 60)
-print("\n1. 権限付与・剥奪:")
-print("   - SHOW GRANTS: 現在の権限を確認")
-print("   - GRANT: 権限を付与")
-print("   - REVOKE: 権限を剥奪")
-print("\n2. データ更新とバージョン管理:")
-print("   - UPDATE: データを更新")
-print("   - DESCRIBE HISTORY: 変更履歴を確認")
-print("   - バージョン番号が自動的にインクリメント")
-print("\n3. Time Travel:")
-print("   - VERSION AS OF: 特定バージョンのデータを参照")
-print("   - TIMESTAMP AS OF: 特定時点のデータを参照")
-print("   - RESTORE: 過去のバージョンにデータを復元")
-print("\n💡 Delta Lakeの特徴:")
-print("   - ACIDトランザクション保証")
-print("   - スキーマ進化のサポート")
-print("   - 監査ログとしての変更履歴")
-print("   - データ復旧のためのTime Travel")
-
+restored_version = spark.sql(f"""
+    SELECT MAX(version) AS ver FROM (DESCRIBE HISTORY {target_table})
+""").collect()[0]["ver"]
+print(f"データを復元しました（現在のバージョン: {restored_version}）")
+print("RESTOREにより、過去のバージョンにデータを戻すことができました！")
