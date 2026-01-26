@@ -5,6 +5,14 @@
 # MAGIC このノートブックでは、Goldテーブルを使ってAI/BI Genie Research Agentに投げるサンプルプロンプトを紹介します。
 # MAGIC
 # MAGIC **対象テーブル:**
+# MAGIC - `sl_users`       - シルバー層/顧客マスタ
+# MAGIC - `sl_items`       - シルバー層/ 商品マスタ
+# MAGIC - `sl_stores`      - シルバー層/ 店舗マスタ
+# MAGIC - `sl_orders`      - シルバー層/ 注文データ（会計単位）
+# MAGIC - `sl_order_items` - シルバー層/ 注文詳細（アイテム単位）
+# MAGIC
+# MAGIC OR
+# MAGIC
 # MAGIC - `gd_users` - 顧客マスタ（RFM・クラスター情報付き）
 # MAGIC - `gd_orders` - 注文データ（会計単位）
 # MAGIC - `gd_order_items` - 注文明細（アイテム単位）

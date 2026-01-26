@@ -16,6 +16,13 @@
 # MAGIC - `sl_orders`
 # MAGIC - `sl_order_items`
 # MAGIC
+# MAGIC OR
+# MAGIC
+# MAGIC - `gd_users`
+# MAGIC - `gd_orders`
+# MAGIC - `gd_order_items`
+# MAGIC
+# MAGIC
 # MAGIC #### 設定
 # MAGIC - Title: `メダリオンハンズオン｜小売スーパー・CDP購買分析`
 # MAGIC - Description: `ブリックスマートの販売データを用いたCDP顧客分析アシスタント`
