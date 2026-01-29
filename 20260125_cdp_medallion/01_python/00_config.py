@@ -64,6 +64,9 @@ print(f"MY_VOLUME: {MY_VOLUME}")
 # COMMAND ----------
 
 # DBTITLE 1,カタログ・スキーマ・Volume作成
+# # カタログ作成
+# spark.sql(f"CREATE CATALOG IF NOT EXISTS {catalog};")
+
 # スキーマ作成（カタログは既存のものを使用）
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {MY_CATALOG}.{MY_SCHEMA}")
 
