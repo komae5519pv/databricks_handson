@@ -147,13 +147,13 @@ display(df_inventory)
 # COMMAND ----------
 
 # DBTITLE 1,CSV出力
-# pandasに変換してCSV文字列を作る
-csv_data = df_inventory.toPandas().to_csv(index=False)
+# # pandasに変換してCSV文字列を作る
+# csv_data = df_inventory.toPandas().to_csv(index=False)
 
-# CSV保存
-file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/inventory/inventory.csv"
-dbutils.fs.put(file_path, csv_data, True)
-print(f"CSV保存完了: {file_path}")
+# # CSV保存
+# file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/inventory/inventory.csv"
+# dbutils.fs.put(file_path, csv_data, True)
+# print(f"CSV保存完了: {file_path}")
 
 # COMMAND ----------
 
@@ -333,13 +333,13 @@ display(df_product)
 # COMMAND ----------
 
 # DBTITLE 1,CSV出力
-# pandasに変換してCSV文字列を作る
-csv_data = df_product.toPandas().to_csv(index=False)
+# # pandasに変換してCSV文字列を作る
+# csv_data = df_product.toPandas().to_csv(index=False)
 
-# CSV保存
-file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/product/product.csv"
-dbutils.fs.put(file_path, csv_data, True)
-print(f"CSV保存完了: {file_path}")
+# # CSV保存
+# file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/product/product.csv"
+# dbutils.fs.put(file_path, csv_data, True)
+# print(f"CSV保存完了: {file_path}")
 
 # COMMAND ----------
 
@@ -450,13 +450,13 @@ display(df_reservation)
 # COMMAND ----------
 
 # DBTITLE 1,CSV出力
-# pandasに変換してCSV文字列を作る
-csv_data = df_reservation.toPandas().to_csv(index=False)
+# # pandasに変換してCSV文字列を作る
+# csv_data = df_reservation.toPandas().to_csv(index=False)
 
-# CSV保存
-file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/reservation/reservation.csv"
-dbutils.fs.put(file_path, csv_data, True)
-print(f"CSV保存完了: {file_path}")
+# # CSV保存
+# file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/reservation/reservation.csv"
+# dbutils.fs.put(file_path, csv_data, True)
+# print(f"CSV保存完了: {file_path}")
 
 # COMMAND ----------
 
@@ -753,10 +753,10 @@ display(df_sales)
 # COMMAND ----------
 
 # DBTITLE 1,CSV出力
-csv_data = df_sales.toPandas().to_csv(index=False)
-file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/sales/sales.csv"
-dbutils.fs.put(file_path, csv_data, True)
-print(f"CSV保存完了: {file_path}")
+# csv_data = df_sales.toPandas().to_csv(index=False)
+# file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/sales/sales.csv"
+# dbutils.fs.put(file_path, csv_data, True)
+# print(f"CSV保存完了: {file_path}")
 
 # COMMAND ----------
 
