@@ -1,9 +1,0 @@
-command:
-- "python"
-- "test_agent.py"
-
-env:
-- name: "SPACE_ID"
-  value: "01efef8fcc991c209eaaa593223ff84e"
-- name: "SERVING_ENDPOINT_NAME"
-  value: "mas-93856fe9-endpoint"
