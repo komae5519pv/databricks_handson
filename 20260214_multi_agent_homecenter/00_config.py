@@ -1,7 +1,7 @@
 # Databricks notebook source
 # カタログ情報
-catalog = "komae_demo_v4"              # ご自分のカタログ名に変更してください
-schema = "demo_multi_agent"
+catalog = "<カタログ名>"              # 任意のカタログ名に変更してください
+schema = "multi_agent_team1"        # 任意のスキーマ名に変更してください
 volume = "raw"
 
 # 会計年度（3月始まり〜翌2月末）
