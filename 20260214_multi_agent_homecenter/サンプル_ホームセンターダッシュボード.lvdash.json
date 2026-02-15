@@ -1,0 +1,1838 @@
+{
+  "datasets": [
+    {
+      "name": "dataset1",
+      "displayName": "sample_superstore",
+      "queryLines": [
+        "SELECT * FROM komae_demo_v4.demo_multi_agent.sales"
+      ],
+      "columns": [
+        {
+          "displayName": "割引カテゴリ（Discount Category）",
+          "description": "注文から出荷まで何日かかったか",
+          "expression": "CASE\n  WHEN discount_rate = 0 THEN '割引なし'\n  WHEN discount_rate < 0.2 THEN '小割引'\n  WHEN discount_rate < 0.5 THEN '中割引'\n  ELSE '大割引'\nEND"
+        },
+        {
+          "displayName": "利益率カテゴリ（Margin Category）",
+          "description": "行ごとの利益率を基に、高利益・中利益・低利益・利益なしの4分類",
+          "expression": "CASE\n  WHEN sales_amount = 0 THEN '利益なし'\n  WHEN profit / sales_amount >= 0.2 THEN '高利益'\n  WHEN profit / sales_amount >= 0.1 THEN '中利益'\n  ELSE '低利益'\nEND"
+        },
+        {
+          "displayName": "単価カテゴリ（Unit Price Band）",
+          "description": "売上金額を数量で割った単価を基に、高単価・中単価・低単価に分類したカテゴリ",
+          "expression": "CASE\n  WHEN quantity = 0 THEN '単価不明'\n  WHEN sales_amount / quantity >= 50000 THEN '高単価'\n  WHEN sales_amount / quantity >= 10000 THEN '中単価'\n  ELSE '低単価'\nEND"
+        },
+        {
+          "displayName": "返品フラグ（Returned Flag）",
+          "description": "注文が返品されたかどうかを示すシンプルな分類",
+          "expression": "CASE\n  WHEN returned THEN '返品'\n  ELSE '通常'\nEND"
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "628c0f8b",
+      "displayName": "概要",
+      "layout": [
+        {
+          "widget": {
+            "name": "8e24940a",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# ホームセンター分析ダッシュボード"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "4977e242",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(sales_amount)",
+                  "displayName": "Sum of 売上"
+                }
+              },
+              "frame": {
+                "title": "売上合計",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "107d3c55",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "sum(profit)",
+                      "expression": "SUM(`profit`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(profit)",
+                  "displayName": "Sum of 利益"
+                }
+              },
+              "frame": {
+                "title": "利益合計",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "56c635fe",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "countdistinct(customer_id)",
+                      "expression": "COUNT(DISTINCT `customer_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "countdistinct(customer_id)",
+                  "displayName": "Count of Unique 顧客 ID"
+                }
+              },
+              "frame": {
+                "title": "顧客数",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "4911bc99",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "avg(sales_amount)",
+                      "expression": "AVG(`sales_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(sales_amount)",
+                  "displayName": "Average 売上"
+                }
+              },
+              "frame": {
+                "title": "顧客単価",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "d38d10e7",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "sum(quantity)",
+                      "expression": "SUM(`quantity`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(quantity)",
+                  "displayName": "Sum of 数量"
+                }
+              },
+              "frame": {
+                "title": "販売数量",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "2bdbb24d",
+            "queries": [
+              {
+                "name": "dashboards/01f0d5d14a4912b8b7d7177c10f7632f/datasets/01f0d5d14a4919a0ba8ca23594f2b116_region",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "region_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "region",
+                    "queryName": "dashboards/01f0d5d14a4912b8b7d7177c10f7632f/datasets/01f0d5d14a4919a0ba8ca23594f2b116_region"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "地域"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 0,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "fcf8049a",
+            "queries": [
+              {
+                "name": "dashboards/01f0d5d14a4912b8b7d7177c10f7632f/datasets/01f0d5d14a4919a0ba8ca23594f2b116_category",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "category_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "category",
+                    "queryName": "dashboards/01f0d5d14a4912b8b7d7177c10f7632f/datasets/01f0d5d14a4919a0ba8ca23594f2b116_category"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "カテゴリ"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 1,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "abaaff45",
+            "queries": [
+              {
+                "name": "dashboards/01f0d5d14a4912b8b7d7177c10f7632f/datasets/01f0d5d14a4919a0ba8ca23594f2b116_customer_segment",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "customer_segment",
+                      "expression": "`customer_segment`"
+                    },
+                    {
+                      "name": "customer_segment_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "customer_segment",
+                    "queryName": "dashboards/01f0d5d14a4912b8b7d7177c10f7632f/datasets/01f0d5d14a4919a0ba8ca23594f2b116_customer_segment"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "顧客区分"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 2,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "91eac6d3",
+            "queries": [
+              {
+                "name": "dashboards/01f0d5d14a4912b8b7d7177c10f7632f/datasets/01f0d5d14a4919a0ba8ca23594f2b116_order_date",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "order_date",
+                      "expression": "`order_date`"
+                    },
+                    {
+                      "name": "order_date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "order_date",
+                    "queryName": "dashboards/01f0d5d14a4912b8b7d7177c10f7632f/datasets/01f0d5d14a4919a0ba8ca23594f2b116_order_date"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "オーダー日"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 3,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "a4128941",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "monthly(order_date)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `order_date`)"
+                    },
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    },
+                    {
+                      "name": "sum(profit)",
+                      "expression": "SUM(`profit`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "combo",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(order_date)",
+                  "displayName": "オーダー日",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "primary": {
+                    "fields": [
+                      {
+                        "fieldName": "sum(sales_amount)",
+                        "displayName": "Sum of 売上"
+                      }
+                    ]
+                  },
+                  "secondary": {
+                    "fields": [
+                      {
+                        "fieldName": "sum(profit)",
+                        "displayName": "Sum of 利益"
+                      }
+                    ]
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "title": "実績推移",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 12,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "ce0d157e",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "sum(profit)",
+                      "expression": "SUM(`profit`)"
+                    },
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    },
+                    {
+                      "name": "sub_category",
+                      "expression": "`sub_category`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "sum(sales_amount)",
+                  "displayName": "Sum of 売上",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "sub_category",
+                  "displayName": "サブカテゴリ",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "sum(profit)",
+                  "displayName": "Sum of 利益",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "redblue"
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "title": "サブカテゴリ別の売上を棒グラフ、利益を色で表現",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 8,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "daf1e4e9",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "sum(profit)",
+                      "expression": "SUM(`profit`)"
+                    },
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    },
+                    {
+                      "name": "country_region",
+                      "expression": "`country_region`"
+                    },
+                    {
+                      "name": "prefecture",
+                      "expression": "`prefecture`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "choropleth-map",
+              "encodings": {
+                "color": {
+                  "fieldName": "sum(profit)",
+                  "legend": {
+                    "hide": true
+                  },
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Sum of 利益",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "redblue"
+                    },
+                    "reverse": false
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "sum(sales_amount)",
+                    "displayName": "Sum of 売上"
+                  },
+                  {
+                    "fieldName": "sum(profit)",
+                    "displayName": "Sum of 利益"
+                  }
+                ],
+                "region": {
+                  "regionType": "mapbox-v4-admin",
+                  "admin0": {
+                    "fieldName": "country_region",
+                    "type": "field",
+                    "geographicRole": "admin0-name"
+                  },
+                  "admin1": {
+                    "fieldName": "prefecture",
+                    "type": "field",
+                    "geographicRole": "admin1-name"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "地域実績"
+              },
+              "mark": {
+                "opacity": 1
+              },
+              "style": {
+                "fontColor": {
+                  "light": "#FFFEFE"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 6,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "439710c5",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "customer_segment",
+                      "expression": "`customer_segment`"
+                    },
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "sankey",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(sales_amount)",
+                  "displayName": "Sum of 売上"
+                },
+                "stages": [
+                  {
+                    "fieldName": "category",
+                    "displayName": "カテゴリ"
+                  },
+                  {
+                    "fieldName": "region",
+                    "displayName": "地域"
+                  },
+                  {
+                    "fieldName": "customer_segment",
+                    "displayName": "顧客区分"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "関係性"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 13,
+            "width": 6,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "aad8b7d8",
+      "displayName": "詳細",
+      "layout": [
+        {
+          "widget": {
+            "name": "ac03c6e6",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "sub_category",
+                      "expression": "`sub_category`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "prefecture",
+                      "expression": "`prefecture`"
+                    },
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    },
+                    {
+                      "name": "sum(profit)",
+                      "expression": "SUM(`profit`)"
+                    },
+                    {
+                      "name": "sum(quantity)",
+                      "expression": "SUM(`quantity`)"
+                    },
+                    {
+                      "name": "avg(discount_rate)",
+                      "expression": "AVG(`discount_rate`)"
+                    }
+                  ],
+                  "cubeGroupingSets": {
+                    "sets": [
+                      {
+                        "fieldNames": [
+                          "category",
+                          "sub_category"
+                        ]
+                      },
+                      {
+                        "fieldNames": [
+                          "region",
+                          "prefecture"
+                        ]
+                      }
+                    ]
+                  },
+                  "disaggregated": false,
+                  "orders": [
+                    {
+                      "direction": "ASC",
+                      "expression": "`category`"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`sub_category`"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`region`"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`prefecture`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pivot",
+              "encodings": {
+                "rows": [
+                  {
+                    "fieldName": "category",
+                    "displayName": "カテゴリ"
+                  },
+                  {
+                    "fieldName": "sub_category",
+                    "displayName": "サブカテゴリ"
+                  }
+                ],
+                "columns": [
+                  {
+                    "fieldName": "region",
+                    "displayName": "地域"
+                  },
+                  {
+                    "fieldName": "prefecture",
+                    "displayName": "都道府県"
+                  }
+                ],
+                "cell": {
+                  "type": "multi-cell",
+                  "fields": [
+                    {
+                      "fieldName": "sum(sales_amount)",
+                      "cellType": "text",
+                      "format": {
+                        "type": "number-currency",
+                        "currencyCode": "JPY",
+                        "abbreviation": "none",
+                        "decimalPlaces": {
+                          "type": "exact",
+                          "places": 0
+                        },
+                        "hideGroupSeparator": false
+                      },
+                      "displayName": "Sum of 売上"
+                    },
+                    {
+                      "fieldName": "sum(profit)",
+                      "cellType": "text",
+                      "format": {
+                        "type": "number-currency",
+                        "currencyCode": "JPY",
+                        "abbreviation": "none",
+                        "decimalPlaces": {
+                          "type": "exact",
+                          "places": 0
+                        },
+                        "hideGroupSeparator": false
+                      },
+                      "displayName": "Sum of 利益"
+                    },
+                    {
+                      "fieldName": "sum(quantity)",
+                      "cellType": "text",
+                      "displayName": "Sum of 数量"
+                    },
+                    {
+                      "fieldName": "avg(discount_rate)",
+                      "cellType": "text",
+                      "format": {
+                        "type": "number-percent",
+                        "decimalPlaces": {
+                          "type": "exact",
+                          "places": 1
+                        },
+                        "hideGroupSeparator": true
+                      },
+                      "style": {
+                        "type": "color-scale",
+                        "backgroundColor": {
+                          "scale": {
+                            "type": "quantitative",
+                            "colorRamp": {
+                              "mode": "scheme",
+                              "scheme": "redblue"
+                            },
+                            "reverse": true
+                          }
+                        }
+                      },
+                      "displayName": "Average 割引率"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "97a605e1",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "monthly(order_date)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `order_date`)"
+                    },
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(order_date)",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(sales_amount)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "title": "月別売上推移",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 6,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "chiikibetsu-no-uriage-wo-bougurafu-de-hyougen-kategori-goto-ni",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "region",
+                  "scale": {
+                    "type": "categorical",
+                    "categorySize": {
+                      "type": "number-of-categories",
+                      "number": 20
+                    },
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(sales_amount)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "title": "地域別の売上を棒グラフで表現（カテゴリごとに色分け）",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "2d214274",
+      "displayName": "表現",
+      "layout": [
+        {
+          "widget": {
+            "name": "ab326f4d",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "customer_segment",
+                      "expression": "`customer_segment`"
+                    },
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "sankey",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(sales_amount)",
+                  "displayName": "Sum of 売上"
+                },
+                "stages": [
+                  {
+                    "fieldName": "category",
+                    "displayName": "カテゴリ"
+                  },
+                  {
+                    "fieldName": "region",
+                    "displayName": "地域"
+                  },
+                  {
+                    "fieldName": "customer_segment",
+                    "displayName": "顧客区分"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "サンキーチャート"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "a92b3cda",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "ship_mode",
+                      "expression": "`ship_mode`"
+                    },
+                    {
+                      "name": "min(sales_amount)",
+                      "expression": "MIN(`sales_amount`)"
+                    },
+                    {
+                      "name": "q1(sales_amount)",
+                      "expression": "PERCENTILE(`sales_amount`, 0.25)"
+                    },
+                    {
+                      "name": "median(sales_amount)",
+                      "expression": "MEDIAN(`sales_amount`)"
+                    },
+                    {
+                      "name": "q3(sales_amount)",
+                      "expression": "PERCENTILE(`sales_amount`, 0.75)"
+                    },
+                    {
+                      "name": "max(sales_amount)",
+                      "expression": "MAX(`sales_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "box",
+              "encodings": {
+                "x": {
+                  "fieldName": "ship_mode",
+                  "displayName": "出荷モード",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "whiskerStart": {
+                    "fieldName": "min(sales_amount)"
+                  },
+                  "boxStart": {
+                    "fieldName": "q1(sales_amount)"
+                  },
+                  "boxMid": {
+                    "fieldName": "median(sales_amount)"
+                  },
+                  "boxEnd": {
+                    "fieldName": "q3(sales_amount)"
+                  },
+                  "whiskerEnd": {
+                    "fieldName": "max(sales_amount)"
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "箱ひげ図"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "3d3e5743",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "monthly(order_date)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `order_date`)"
+                    },
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "area",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(order_date)",
+                  "displayName": "オーダー日",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(sales_amount)",
+                  "displayName": "Sum of 売上",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "エリアグラフ"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "ee88fee4",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "budget",
+                      "expression": "`budget`"
+                    },
+                    {
+                      "name": "sales_amount",
+                      "expression": "`sales_amount`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sales_amount",
+                  "displayName": "売上"
+                },
+                "target": {
+                  "fieldName": "budget",
+                  "displayName": "予算"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "カウンター"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "6bc80614",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "monthly(order_date)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `order_date`)"
+                    },
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    },
+                    {
+                      "name": "sum(profit)",
+                      "expression": "SUM(`profit`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "combo",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(order_date)",
+                  "displayName": "オーダー日",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "label": {
+                  "show": false
+                },
+                "y": {
+                  "primary": {
+                    "fields": [
+                      {
+                        "fieldName": "sum(sales_amount)",
+                        "displayName": "Sum of 売上"
+                      }
+                    ]
+                  },
+                  "secondary": {
+                    "fields": [
+                      {
+                        "fieldName": "sum(profit)",
+                        "displayName": "Sum of 利益"
+                      }
+                    ]
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "二重軸"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 6,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "4055e148",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "sum(profit)",
+                      "expression": "SUM(`profit`)"
+                    },
+                    {
+                      "name": "customer_segment",
+                      "expression": "`customer_segment`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "customer_segment",
+                  "displayName": "顧客区分",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "region",
+                  "displayName": "地域",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "sum(profit)",
+                  "displayName": "Sum of 利益",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "show": false
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "ヒートマップ"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 6,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "68c67d10",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    },
+                    {
+                      "name": "customer_segment",
+                      "expression": "`customer_segment`"
+                    },
+                    {
+                      "name": "sum(profit)",
+                      "expression": "SUM(`profit`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "sum(sales_amount)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Sum of 売上"
+                },
+                "color": {
+                  "fieldName": "customer_segment",
+                  "displayName": "顧客区分",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                },
+                "extra": [
+                  {
+                    "fieldName": "sum(sales_amount)",
+                    "displayName": "Sum of 売上"
+                  },
+                  {
+                    "fieldName": "sum(profit)",
+                    "displayName": "Sum of 利益"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "円グラフ",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 12,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "385a7b64",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "sum(profit)",
+                      "expression": "SUM(`profit`)"
+                    },
+                    {
+                      "name": "sum(sales_amount)",
+                      "expression": "SUM(`sales_amount`)"
+                    },
+                    {
+                      "name": "country_region",
+                      "expression": "`country_region`"
+                    },
+                    {
+                      "name": "prefecture",
+                      "expression": "`prefecture`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "choropleth-map",
+              "encodings": {
+                "color": {
+                  "fieldName": "sum(profit)",
+                  "displayName": "Sum of 利益",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "redblue"
+                    }
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "sum(sales_amount)",
+                    "displayName": "Sum of 売上"
+                  },
+                  {
+                    "fieldName": "sum(profit)",
+                    "displayName": "Sum of 利益"
+                  }
+                ],
+                "region": {
+                  "regionType": "mapbox-v4-admin",
+                  "admin0": {
+                    "fieldName": "country_region",
+                    "type": "field",
+                    "geographicRole": "admin0-name"
+                  },
+                  "admin1": {
+                    "fieldName": "prefecture",
+                    "type": "field",
+                    "geographicRole": "admin1-name"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "MAP"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 12,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "4274f5d9",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "customer_segment",
+                      "expression": "`customer_segment`"
+                    },
+                    {
+                      "name": "sales_amount",
+                      "expression": "`sales_amount`"
+                    },
+                    {
+                      "name": "profit",
+                      "expression": "`profit`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "scatter",
+              "encodings": {
+                "x": {
+                  "fieldName": "sales_amount",
+                  "displayName": "売上",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "profit",
+                  "displayName": "利益",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "customer_segment",
+                  "displayName": "顧客区分",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "title": "散布図",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 2,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "6c98fe67",
+      "displayName": "グローバルフィルター",
+      "layout": [
+        {
+          "widget": {
+            "name": "6bce3ea6",
+            "queries": [
+              {
+                "name": "dashboards/01f0d5d14a4912b8b7d7177c10f7632f/datasets/01f0d5d14a4919a0ba8ca23594f2b116_category",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "category_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "category",
+                    "queryName": "dashboards/01f0d5d14a4912b8b7d7177c10f7632f/datasets/01f0d5d14a4919a0ba8ca23594f2b116_category"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "0769fe4f",
+            "queries": [
+              {
+                "name": "dashboards/01f0d5d14a4912b8b7d7177c10f7632f/datasets/01f0d5d14a4919a0ba8ca23594f2b116_customer_segment",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "customer_segment",
+                      "expression": "`customer_segment`"
+                    },
+                    {
+                      "name": "customer_segment_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "customer_segment",
+                    "queryName": "dashboards/01f0d5d14a4912b8b7d7177c10f7632f/datasets/01f0d5d14a4919a0ba8ca23594f2b116_customer_segment"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "7129b289",
+            "queries": [
+              {
+                "name": "dashboards/01f109c07f0a148893e1b947c973790f/datasets/01f109c07f0a1999b5213fc04f32958c_prefecture",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "prefecture",
+                      "expression": "`prefecture`"
+                    },
+                    {
+                      "name": "prefecture_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "prefecture",
+                    "queryName": "dashboards/01f109c07f0a148893e1b947c973790f/datasets/01f109c07f0a1999b5213fc04f32958c_prefecture"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "locale": "ja-JP",
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "genieSpace": {
+      "isEnabled": true,
+      "overrideId": "01f109a8073f11cb89eb8b763f23e251",
+      "enablementMode": "ENABLED"
+    },
+    "applyModeEnabled": false
+  }
+}
