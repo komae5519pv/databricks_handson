@@ -18,10 +18,11 @@
 # MAGIC - `inventory`
 # MAGIC - `reservation`
 # MAGIC - `sales`
+# MAGIC - `employee`
 # MAGIC
 # MAGIC #### 設定
 # MAGIC - Title: `ホームセンター在庫分析`
-# MAGIC - Description: `店舗横断の在庫・商品マスタ・取り置き状況を自然言語で検索・分析できるエージェントです。ユーザーの質問に対応し、在庫・入荷・取り寄せを横断的に分析して最適な回答を提示します。`
+# MAGIC - Description: `inventory（在庫）・product（商品マスタ）・reservation（取り置き）・sales（売上）・employee（従業員）テーブルを参照し、在庫数・入荷予定・予約状況・商品スペック・価格・売上実績・担当者情報などの構造化データを横断的に検索・分析するエージェント`
 # MAGIC - Default Warehouse: <任意のSQL Warehouse>
 # MAGIC
 # MAGIC #### 指示

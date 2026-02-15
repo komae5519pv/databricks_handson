@@ -147,13 +147,13 @@ display(df_inventory)
 # COMMAND ----------
 
 # DBTITLE 1,CSV出力
-# # pandasに変換してCSV文字列を作る
-# csv_data = df_inventory.toPandas().to_csv(index=False)
+# pandasに変換してCSV文字列を作る
+csv_data = df_inventory.toPandas().to_csv(index=False)
 
-# # CSV保存
-# file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/inventory/inventory.csv"
-# dbutils.fs.put(file_path, csv_data, True)
-# print(f"CSV保存完了: {file_path}")
+# CSV保存
+file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/inventory/inventory.csv"
+dbutils.fs.put(file_path, csv_data, True)
+print(f"CSV保存完了: {file_path}")
 
 # COMMAND ----------
 
@@ -333,13 +333,13 @@ display(df_product)
 # COMMAND ----------
 
 # DBTITLE 1,CSV出力
-# # pandasに変換してCSV文字列を作る
-# csv_data = df_product.toPandas().to_csv(index=False)
+# pandasに変換してCSV文字列を作る
+csv_data = df_product.toPandas().to_csv(index=False)
 
-# # CSV保存
-# file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/product/product.csv"
-# dbutils.fs.put(file_path, csv_data, True)
-# print(f"CSV保存完了: {file_path}")
+# CSV保存
+file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/product/product.csv"
+dbutils.fs.put(file_path, csv_data, True)
+print(f"CSV保存完了: {file_path}")
 
 # COMMAND ----------
 
@@ -413,7 +413,7 @@ reservation_schema = StructType([
     StructField("limit_date", DateType(), True),
     StructField("status", StringType(), True),
     StructField("note", StringType(), True),
-    StructField("staff", StringType(), True),
+    StructField("employee_id", StringType(), True),
     StructField("created_at", TimestampType(), True),
 ])
 
@@ -422,10 +422,10 @@ one_week_later = today + timedelta(days=7)
 
 # サンプルデータ
 reservation_data = [
-    ("", "T01", "多摩店", 1001, "インパクトドライバー 10.8V", "佐藤工務店", "法人(プロ会員)", 1, one_week_later.date(), "希望中", "現場で必要。来週月曜までに確保希望", "担当A", today - timedelta(days=3)),
-    ("", "T01", "多摩店", 1005, "水性木部保護塗料 1.6L", "田中太郎", "個人", 1, one_week_later.date(), "希望中", "ウッドデッキ塗り替え用", "担当B", today - timedelta(days=2)),
-    ("", "K01", "横浜店", 1006, "防水塗料 0.7L", "鈴木花子", "個人", 1, one_week_later.date(), "希望中", "色味確認中。週末引取予定", "担当C", today - timedelta(days=1)),
-    ("", "S01", "さいたま店", 1012, "培養土 25L", "山田園芸", "法人(プロ会員)", 10, one_week_later.date(), "希望中", "植栽工事用。50袋中10袋先行確保", "担当A", today)
+    ("", "T01", "多摩店", 1001, "インパクトドライバー 10.8V", "佐藤工務店", "法人(プロ会員)", 1, one_week_later.date(), "希望中", "現場で必要。来週月曜までに確保希望", "E001", today - timedelta(days=3)),
+    ("", "T01", "多摩店", 1005, "水性木部保護塗料 1.6L", "田中太郎", "個人", 1, one_week_later.date(), "希望中", "ウッドデッキ塗り替え用", "E002", today - timedelta(days=2)),
+    ("", "K01", "横浜店", 1006, "防水塗料 0.7L", "鈴木花子", "個人", 1, one_week_later.date(), "希望中", "色味確認中。週末引取予定", "E004", today - timedelta(days=1)),
+    ("", "S01", "さいたま店", 1012, "培養土 25L", "山田園芸", "法人(プロ会員)", 10, one_week_later.date(), "希望中", "植栽工事用。50袋中10袋先行確保", "E005", today)
 ]
 
 df_reservation = spark.createDataFrame(reservation_data, schema=reservation_schema)
@@ -436,7 +436,7 @@ df_reservation = df_reservation.withColumn("reservation_id", expr("uuid()"))
 # 保存用にカラム並び替え
 df_reservation = df_reservation.select(
     "reservation_id", "store_id", "store_name", "product_id", "product_name",
-    "customer_name", "customer_type", "quantity", "limit_date", "status", "note", "staff", "created_at"
+    "customer_name", "customer_type", "quantity", "limit_date", "status", "note", "employee_id", "created_at"
 )
 
 # Deltaテーブルとして保存
@@ -450,13 +450,13 @@ display(df_reservation)
 # COMMAND ----------
 
 # DBTITLE 1,CSV出力
-# # pandasに変換してCSV文字列を作る
-# csv_data = df_reservation.toPandas().to_csv(index=False)
+# pandasに変換してCSV文字列を作る
+csv_data = df_reservation.toPandas().to_csv(index=False)
 
-# # CSV保存
-# file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/reservation/reservation.csv"
-# dbutils.fs.put(file_path, csv_data, True)
-# print(f"CSV保存完了: {file_path}")
+# CSV保存
+file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/reservation/reservation.csv"
+dbutils.fs.put(file_path, csv_data, True)
+print(f"CSV保存完了: {file_path}")
 
 # COMMAND ----------
 
@@ -495,7 +495,7 @@ column_comments = {
     "limit_date": "取り置き期限日",
     "status": "希望中／確定／キャンセルなどの状態区分",
     "note": "備考・理由・申込状況など",
-    "staff": "受付担当スタッフ名",
+    "employee_id": "受付担当スタッフの従業員ID（employeeテーブルのemployee_idと紐づく）",
     "created_at": "受付日時（レコード作成タイムスタンプ）"
 }
 
@@ -753,10 +753,10 @@ display(df_sales)
 # COMMAND ----------
 
 # DBTITLE 1,CSV出力
-# csv_data = df_sales.toPandas().to_csv(index=False)
-# file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/sales/sales.csv"
-# dbutils.fs.put(file_path, csv_data, True)
-# print(f"CSV保存完了: {file_path}")
+csv_data = df_sales.toPandas().to_csv(index=False)
+file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/sales/sales.csv"
+dbutils.fs.put(file_path, csv_data, True)
+print(f"CSV保存完了: {file_path}")
 
 # COMMAND ----------
 
@@ -809,6 +809,88 @@ column_comments = {
     "budget":           "地域予算（円）",
     "returned":         "返品有無（true = 返品あり）",
     "product_id":       "商品ID（productテーブルのproduct_idと紐づくFK）"
+}
+
+for column, cmt in column_comments.items():
+    escaped_cmt = cmt.replace("'", "\\'")
+    sql = f"ALTER TABLE {table_name} ALTER COLUMN {column} COMMENT '{escaped_cmt}'"
+    spark.sql(sql)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 1-5. employee / 従業員マスタ
+
+# COMMAND ----------
+
+# DBTITLE 1,テーブル作成
+from pyspark.sql.types import StructType, StructField, StringType
+from pyspark.sql.functions import expr
+
+employee_schema = StructType([
+    StructField("employee_id", StringType(), True),
+    StructField("email", StringType(), True),
+    StructField("employee_name", StringType(), True),
+    StructField("store_id", StringType(), True),
+    StructField("store_name", StringType(), True),
+    StructField("role", StringType(), True),
+])
+
+employee_data = [
+    ("E001", "konomi.omae@databricks.com", "大前 このみ", "T01", "多摩店",     "スタッフ"),
+    ("E002", "taro.yamada@example.com",    "山田 太郎",   "T01", "多摩店",     "店長"),
+    ("E003", "hanako.suzuki@example.com",  "鈴木 花子",   "T02", "八王子店",   "スタッフ"),
+    ("E004", "kenji.sato@example.com",     "佐藤 健二",   "K01", "横浜店",     "店長"),
+    ("E005", "yuki.tanaka@example.com",    "田中 由紀",   "S01", "さいたま店", "スタッフ"),
+    ("E006", "akira.ito@example.com",      "伊藤 明",     "O01", "大阪店",     "店長"),
+]
+
+df_employee = spark.createDataFrame(employee_data, schema=employee_schema)
+df_employee.write.format("delta").mode("overwrite").saveAsTable(f"{catalog}.{schema}.employee")
+
+print(df_employee.columns)
+print(df_employee.count())
+display(df_employee)
+
+# COMMAND ----------
+
+# DBTITLE 1,CSV出力
+csv_data = df_employee.toPandas().to_csv(index=False)
+file_path = f"/Volumes/{catalog}/{schema}/{volume}/structured/employee/employee.csv"
+dbutils.fs.put(file_path, csv_data, True)
+print(f"CSV保存完了: {file_path}")
+
+# COMMAND ----------
+
+# DBTITLE 1,認定済みタグの追加
+certified_tag = 'system.Certified'
+
+try:
+    spark.sql(f"ALTER TABLE employee SET TAGS ('{certified_tag}')")
+    print(f"認定済みタグ '{certified_tag}' の追加が完了しました。")
+
+except Exception as e:
+    print(f"認定済みタグ '{certified_tag}' の追加中にエラーが発生しました: {str(e)}")
+    print("このエラーはタグ機能に対応していないワークスペースで実行した場合に発生する可能性があります。")
+
+# COMMAND ----------
+
+# DBTITLE 1,コメント追加
+table_name = f"{catalog}.{schema}.employee"
+
+comment = """
+テーブル名: `employee` / 従業員マスタ
+説明: 店舗スタッフの情報を保持。メールアドレスで current_user() と紐づけ、ログインユーザーの所属店舗・役職を特定する。
+"""
+spark.sql(f'COMMENT ON TABLE {table_name} IS "{comment}"')
+
+column_comments = {
+    "employee_id": "従業員ID",
+    "email": "メールアドレス（Databricksログインアカウントと一致）",
+    "employee_name": "従業員名",
+    "store_id": "所属店舗ID",
+    "store_name": "所属店舗名",
+    "role": "役職（スタッフ／店長）",
 }
 
 for column, cmt in column_comments.items():
@@ -908,15 +990,15 @@ display(spark.sql(f'''DESCRIBE EXTENDED {TABLE_PATH}'''))
 
 # DBTITLE 1,reservation / 取り置き・予約管理
 # =========================
-# reservation：PK(reservation_id) + FK(product_id)
+# reservation：PK(reservation_id) + FK(product_id, employee_id)
 # =========================
 TABLE_PATH = f"{catalog}.{schema}.reservation"
 PK_CONSTRAINT_NAME = "pk_reservation"
-FK_CONSTRAINT_NAME = "fk_reservation_product"
-REF_TABLE_PATH = f"{catalog}.{schema}.product"
+FK_CONSTRAINT_NAME_PRODUCT = "fk_reservation_product"
+FK_CONSTRAINT_NAME_EMPLOYEE = "fk_reservation_employee"
 
 # NOT NULL 制約
-for column in ["reservation_id", "product_id"]:
+for column in ["reservation_id", "product_id", "employee_id"]:
     spark.sql(f"""
     ALTER TABLE {TABLE_PATH}
     ALTER COLUMN {column} SET NOT NULL;
@@ -933,13 +1015,15 @@ ADD CONSTRAINT {PK_CONSTRAINT_NAME} PRIMARY KEY (reservation_id);
 
 # 外部キーを再作成（reservation.product_id → product.product_id）
 spark.sql(f'''
-ALTER TABLE {TABLE_PATH} DROP CONSTRAINT IF EXISTS {FK_CONSTRAINT_NAME};
+ALTER TABLE {TABLE_PATH} DROP CONSTRAINT IF EXISTS {FK_CONSTRAINT_NAME_PRODUCT};
 ''')
 spark.sql(f'''
 ALTER TABLE {TABLE_PATH}
-ADD CONSTRAINT {FK_CONSTRAINT_NAME}
-FOREIGN KEY (product_id) REFERENCES {REF_TABLE_PATH}(product_id);
+ADD CONSTRAINT {FK_CONSTRAINT_NAME_PRODUCT}
+FOREIGN KEY (product_id) REFERENCES {catalog}.{schema}.product(product_id);
 ''')
+
+# ※ FK(employee_id → employee.employee_id) は employee PK 作成後に追加（後続セルで実行）
 
 # チェック
 display(spark.sql(f'''DESCRIBE EXTENDED {TABLE_PATH}'''))
@@ -986,6 +1070,55 @@ display(spark.sql(f'''DESCRIBE EXTENDED {TABLE_PATH}'''))
 
 # COMMAND ----------
 
+# DBTITLE 1,employee / 従業員マスタ
+# =========================
+# employee：PK(employee_id)
+# =========================
+TABLE_PATH = f"{catalog}.{schema}.employee"
+PK_CONSTRAINT_NAME = "pk_employee"
+
+# NOT NULL 制約
+for column in ["employee_id", "email"]:
+    spark.sql(f"""
+    ALTER TABLE {TABLE_PATH}
+    ALTER COLUMN {column} SET NOT NULL;
+    """)
+
+# 主キーを再作成
+spark.sql(f'''
+ALTER TABLE {TABLE_PATH} DROP CONSTRAINT IF EXISTS {PK_CONSTRAINT_NAME};
+''')
+spark.sql(f'''
+ALTER TABLE {TABLE_PATH}
+ADD CONSTRAINT {PK_CONSTRAINT_NAME} PRIMARY KEY (employee_id);
+''')
+
+# チェック
+display(spark.sql(f'''DESCRIBE EXTENDED {TABLE_PATH}'''))
+
+# COMMAND ----------
+
+# DBTITLE 1,reservation → employee 外部キー（employee PK 作成後に実行）
+# =========================
+# reservation.employee_id → employee.employee_id
+# =========================
+FK_CONSTRAINT_NAME_EMPLOYEE = "fk_reservation_employee"
+RESERVATION_PATH = f"{catalog}.{schema}.reservation"
+
+spark.sql(f'''
+ALTER TABLE {RESERVATION_PATH} DROP CONSTRAINT IF EXISTS {FK_CONSTRAINT_NAME_EMPLOYEE};
+''')
+spark.sql(f'''
+ALTER TABLE {RESERVATION_PATH}
+ADD CONSTRAINT {FK_CONSTRAINT_NAME_EMPLOYEE}
+FOREIGN KEY (employee_id) REFERENCES {catalog}.{schema}.employee(employee_id);
+''')
+
+# チェック
+display(spark.sql(f'''DESCRIBE EXTENDED {RESERVATION_PATH}'''))
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## 3. RAG用非構造化データをVolumeに設置
 
@@ -1026,3 +1159,31 @@ for item in target_files:
         print(f"コピー完了: {dest_path}")
     else:
         print(f"コピー元が見つかりません -> {src_path}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 4. UC関数の作成
+
+# COMMAND ----------
+
+# DBTITLE 1,get_current_staff_info 関数
+spark.sql(f"""
+CREATE OR REPLACE FUNCTION {catalog}.{schema}.get_current_staff_info()
+RETURNS STRING
+LANGUAGE SQL
+COMMENT 'ログイン中のユーザーの従業員情報（名前・所属店舗・役職）を返す。従業員マスタに未登録の場合はメールアドレスのみ返す。'
+RETURN (
+  SELECT COALESCE(
+    (SELECT CONCAT('名前: ', employee_name, ' / 所属店舗: ', store_name, ' (', store_id, ') / 役職: ', role)
+     FROM {catalog}.{schema}.employee
+     WHERE email = current_user()
+     LIMIT 1),
+    CONCAT('未登録ユーザー: ', current_user())
+  )
+)
+""")
+print(f"関数作成完了: {catalog}.{schema}.get_current_staff_info()")
+
+# 動作確認
+display(spark.sql(f"SELECT {catalog}.{schema}.get_current_staff_info() AS staff_info"))

@@ -47,7 +47,7 @@
           "position": {
             "x": 0,
             "y": 0,
-            "width": 5,
+            "width": 10,
             "height": 2
           }
         },
@@ -87,7 +87,7 @@
           "position": {
             "x": 0,
             "y": 2,
-            "width": 1,
+            "width": 2,
             "height": 2
           }
         },
@@ -125,9 +125,9 @@
             }
           },
           "position": {
-            "x": 1,
+            "x": 2,
             "y": 2,
-            "width": 1,
+            "width": 2,
             "height": 2
           }
         },
@@ -165,9 +165,9 @@
             }
           },
           "position": {
-            "x": 2,
+            "x": 4,
             "y": 2,
-            "width": 1,
+            "width": 2,
             "height": 2
           }
         },
@@ -205,9 +205,9 @@
             }
           },
           "position": {
-            "x": 3,
+            "x": 6,
             "y": 2,
-            "width": 1,
+            "width": 2,
             "height": 2
           }
         },
@@ -245,9 +245,9 @@
             }
           },
           "position": {
-            "x": 4,
+            "x": 8,
             "y": 2,
-            "width": 1,
+            "width": 2,
             "height": 2
           }
         },
@@ -291,9 +291,9 @@
             }
           },
           "position": {
-            "x": 5,
+            "x": 10,
             "y": 0,
-            "width": 1,
+            "width": 2,
             "height": 1
           }
         },
@@ -337,9 +337,9 @@
             }
           },
           "position": {
-            "x": 5,
+            "x": 10,
             "y": 1,
-            "width": 1,
+            "width": 2,
             "height": 1
           }
         },
@@ -383,9 +383,9 @@
             }
           },
           "position": {
-            "x": 5,
+            "x": 10,
             "y": 2,
-            "width": 1,
+            "width": 2,
             "height": 1
           }
         },
@@ -429,9 +429,9 @@
             }
           },
           "position": {
-            "x": 5,
+            "x": 10,
             "y": 3,
-            "width": 1,
+            "width": 2,
             "height": 1
           }
         },
@@ -503,7 +503,7 @@
           "position": {
             "x": 0,
             "y": 4,
-            "width": 6,
+            "width": 12,
             "height": 4
           }
         },
@@ -573,9 +573,9 @@
             }
           },
           "position": {
-            "x": 3,
+            "x": 6,
             "y": 8,
-            "width": 3,
+            "width": 6,
             "height": 5
           }
         },
@@ -677,7 +677,7 @@
           "position": {
             "x": 0,
             "y": 8,
-            "width": 3,
+            "width": 6,
             "height": 10
           }
         },
@@ -741,14 +741,15 @@
             }
           },
           "position": {
-            "x": 3,
+            "x": 6,
             "y": 13,
-            "width": 3,
+            "width": 6,
             "height": 5
           }
         }
       ],
-      "pageType": "PAGE_TYPE_CANVAS"
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
     },
     {
       "name": "aad8b7d8",
@@ -1825,35 +1826,7 @@
   "uiSettings": {
     "locale": "ja-JP",
     "theme": {
-      "canvasBackgroundColor": {
-        "light": "#FAFAFB",
-        "dark": "#1F272D"
-      },
-      "widgetBackgroundColor": {
-        "light": "#FFFFFF",
-        "dark": "#11171C"
-      },
-      "fontColor": {
-        "light": "#11171C",
-        "dark": "#E8ECF0"
-      },
-      "selectionColor": {
-        "light": "#2272B4",
-        "dark": "#8ACAFF"
-      },
-      "visualizationColors": [
-        "#077A9D",
-        "#FFAB00",
-        "#00A972",
-        "#FF3621",
-        "#8BCAE7",
-        "#AB4057",
-        "#99DDB4",
-        "#FCA4A1",
-        "#919191",
-        "#BF7080"
-      ],
-      "widgetHeaderAlignment": "LEFT"
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
     },
     "genieSpace": {
       "isEnabled": true,
