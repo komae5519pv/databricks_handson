@@ -1,0 +1,1197 @@
+{
+  "datasets": [
+    {
+      "name": "dataset1",
+      "displayName": "gd_dashboard_fact",
+      "queryLines": [
+        "SELECT * FROM komae_demo_v4.call_center.gd_dashboard_fact"
+      ],
+      "columns": [
+        {
+          "displayName": "返品率（％）",
+          "description": "返品件数 / 注文件数。全体では約10%、LINEチャネルは15〜18%で突出して高い。",
+          "expression": "SUM(CASE WHEN returned THEN 1 ELSE 0 END) / COUNT(*)"
+        }
+      ]
+    },
+    {
+      "name": "e97e2643",
+      "displayName": "call_log_detail",
+      "queryLines": [
+        "SELECT\n",
+        "    call_date,            -- 通話日\n",
+        "    purpose,              -- 問い合わせ目的（割引クレーム/返品交換/配送納期 等）\n",
+        "    trouble_type,         -- トラブル要因（割引条件/サイズ/納期/品質/請求/なし）\n",
+        "    urgency_level,        -- 緊急度（高/中/低）\n",
+        "    resolution_status,    -- 解決状況（解決/未解決/エスカレーション）\n",
+        "    operator_action,      -- オペレーターの対応内容\n",
+        "    transcript_summary    -- 通話要約（ai_queryで事前生成、50文字以内）\n",
+        "FROM komae_demo_v4.call_center.sv_call_analysis\n",
+        "ORDER BY call_date DESC"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "page1",
+      "displayName": "New Page",
+      "layout": [
+        {
+          "widget": {
+            "name": "media-chaneru",
+            "queries": [
+              {
+                "name": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11533023f1353a5862b9dfe5fe7c8_campaign_channel",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "campaign_channel",
+                      "expression": "`campaign_channel`"
+                    },
+                    {
+                      "name": "campaign_channel_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "媒体チャネル"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "campaign_channel",
+                    "queryName": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11533023f1353a5862b9dfe5fe7c8_campaign_channel"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "shouhin-kategori1",
+            "queries": [
+              {
+                "name": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11533023f1353a5862b9dfe5fe7c8_product_category",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "product_category",
+                      "expression": "`product_category`"
+                    },
+                    {
+                      "name": "product_category_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "商品カテゴリ"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "product_category",
+                    "queryName": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11533023f1353a5862b9dfe5fe7c8_product_category"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "chumon-tsuki",
+            "queries": [
+              {
+                "name": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11533023f1353a5862b9dfe5fe7c8_order_month",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "order_month",
+                      "expression": "`order_month`"
+                    },
+                    {
+                      "name": "order_month_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "注文月"
+              },
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "order_month",
+                    "queryName": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11533023f1353a5862b9dfe5fe7c8_order_month"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "gokei-chufukensu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "合計注文件数"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(*)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "gokei-uriage-kingaku",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "sum(total_amount)",
+                      "expression": "SUM(`total_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "合計売上金額"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_amount)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 1,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "henpin-ritsu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "measure(返品率（％）)",
+                      "expression": "MEASURE(`返品率（％）`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "返品率"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(返品率（％）)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 1,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "yuni-ku-kokyaku-su",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "countdistinct(customer_id)",
+                      "expression": "COUNT(DISTINCT `customer_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "ユニーク顧客数"
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "countdistinct(customer_id)"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 1,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "media-betsu-uriage-chumokubensu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "campaign_channel",
+                      "expression": "`campaign_channel`"
+                    },
+                    {
+                      "name": "sum(total_amount)",
+                      "expression": "SUM(`total_amount`)"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "媒体別 売上・注文件数\t"
+              },
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "campaign_channel",
+                  "displayName": "キャンペーンチャネル",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "natural-order"
+                    }
+                  }
+                },
+                "y": {
+                  "primary": {
+                    "fields": [
+                      {
+                        "fieldName": "sum(total_amount)",
+                        "displayName": "売上"
+                      }
+                    ],
+                    "scale": {
+                      "type": "quantitative"
+                    }
+                  },
+                  "secondary": {
+                    "fields": [
+                      {
+                        "fieldName": "count(*)",
+                        "displayName": "注文件数"
+                      }
+                    ],
+                    "scale": {
+                      "type": "quantitative"
+                    }
+                  }
+                },
+                "color": {
+                  "legend": {
+                    "position": "right"
+                  }
+                },
+                "label": {
+                  "show": false
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "mei-ti-bie-huan-pin-lv",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "campaign_channel",
+                      "expression": "`campaign_channel`"
+                    },
+                    {
+                      "name": "measure(返品率（％）)",
+                      "expression": "MEASURE(`返品率（％）`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "媒体別 返品率"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "campaign_channel",
+                  "displayName": "キャンペーンチャネル",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(返品率（％）)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 4,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "3880c853",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### 媒体比較"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "34dc30c9",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### 返品分析 + 時系列"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "media-betsu-henpin-riyuu-naibun",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "return_reason",
+                      "expression": "`return_reason`"
+                    },
+                    {
+                      "name": "campaign_channel",
+                      "expression": "`campaign_channel`"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`return_reason` IS NOT NULL"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "媒体別 返品理由の内訳"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "campaign_channel",
+                  "displayName": "キャンペーンチャネル",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(*)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "return_reason",
+                  "legend": {
+                    "position": "right"
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "getsuji-uriage-suii",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "campaign_channel",
+                      "expression": "`campaign_channel`"
+                    },
+                    {
+                      "name": "monthly(order_date)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `order_date`)"
+                    },
+                    {
+                      "name": "sum(total_amount)",
+                      "expression": "SUM(`total_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "月次売上推移"
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(order_date)",
+                  "axis": {
+                    "labelAngle": 90
+                  },
+                  "format": {
+                    "type": "date",
+                    "date": "year-month-day",
+                    "leadingZeros": true
+                  },
+                  "displayName": "注文月",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_amount)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "campaign_channel",
+                  "legend": {
+                    "position": "right"
+                  },
+                  "displayName": "キャンペーンチャネル",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 11,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "2c4f4c3f",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### 地域 + 商品"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "todoufuken-betsu-uriage-bunpu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "sum(total_amount)",
+                      "expression": "SUM(`total_amount`)"
+                    },
+                    {
+                      "name": "latitude",
+                      "expression": "`latitude`"
+                    },
+                    {
+                      "name": "longitude",
+                      "expression": "`longitude`"
+                    },
+                    {
+                      "name": "prefecture",
+                      "expression": "`prefecture`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "都道府県別 売上分布"
+              },
+              "widgetType": "symbol-map",
+              "encodings": {
+                "coordinates": {
+                  "latitude": {
+                    "fieldName": "latitude"
+                  },
+                  "longitude": {
+                    "fieldName": "longitude"
+                  }
+                },
+                "color": {
+                  "fieldName": "sum(total_amount)",
+                  "displayName": "売上",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "size": {
+                  "fieldName": "sum(total_amount)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    },
+                    "hideGroupSeparator": false
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "prefecture",
+                    "displayName": "県名"
+                  },
+                  {
+                    "fieldName": "sum(total_amount)",
+                    "displayName": "売上"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 18,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "shouhin-kategori-betsu-uriage-henpin-ritsu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "product_category",
+                      "expression": "`product_category`"
+                    },
+                    {
+                      "name": "sum(total_amount)",
+                      "expression": "SUM(`total_amount`)"
+                    },
+                    {
+                      "name": "measure(返品率（％）)",
+                      "expression": "MEASURE(`返品率（％）`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "title": "商品カテゴリ別 売上・返品率"
+              },
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "product_category",
+                  "displayName": "商品カテゴリ",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "natural-order"
+                    }
+                  }
+                },
+                "y": {
+                  "primary": {
+                    "fields": [
+                      {
+                        "fieldName": "sum(total_amount)",
+                        "displayName": "売上"
+                      }
+                    ],
+                    "scale": {
+                      "type": "quantitative"
+                    }
+                  },
+                  "secondary": {
+                    "fields": [
+                      {
+                        "fieldName": "measure(返品率（％）)"
+                      }
+                    ],
+                    "scale": {
+                      "type": "quantitative",
+                      "domain": {
+                        "max": 0.2,
+                        "min": 0
+                      }
+                    },
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 2
+                      }
+                    }
+                  }
+                },
+                "color": {
+                  "legend": {
+                    "position": "right"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 18,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "d7b61a8b",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### 通話ログ一覧"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 26,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "toiawase-mokuteki",
+            "queries": [
+              {
+                "name": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11546ca451f919f06f7bd47be8591_purpose",
+                "query": {
+                  "datasetName": "e97e2643",
+                  "fields": [
+                    {
+                      "name": "purpose",
+                      "expression": "`purpose`"
+                    },
+                    {
+                      "name": "purpose_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "問い合わせ目的"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "purpose",
+                    "queryName": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11546ca451f919f06f7bd47be8591_purpose"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 27,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "konran-no-shurui",
+            "queries": [
+              {
+                "name": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11546ca451f919f06f7bd47be8591_trouble_type",
+                "query": {
+                  "datasetName": "e97e2643",
+                  "fields": [
+                    {
+                      "name": "trouble_type",
+                      "expression": "`trouble_type`"
+                    },
+                    {
+                      "name": "trouble_type_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "トラブル要因\t"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "trouble_type",
+                    "queryName": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11546ca451f919f06f7bd47be8591_trouble_type"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 27,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "kinkyudo",
+            "queries": [
+              {
+                "name": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11546ca451f919f06f7bd47be8591_urgency_level",
+                "query": {
+                  "datasetName": "e97e2643",
+                  "fields": [
+                    {
+                      "name": "urgency_level",
+                      "expression": "`urgency_level`"
+                    },
+                    {
+                      "name": "urgency_level_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "緊急度"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "urgency_level",
+                    "queryName": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11546ca451f919f06f7bd47be8591_urgency_level"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 27,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "kaiketsu-joukyou",
+            "queries": [
+              {
+                "name": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11546ca451f919f06f7bd47be8591_resolution_status",
+                "query": {
+                  "datasetName": "e97e2643",
+                  "fields": [
+                    {
+                      "name": "resolution_status",
+                      "expression": "`resolution_status`"
+                    },
+                    {
+                      "name": "resolution_status_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "解決状況"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "resolution_status",
+                    "queryName": "dashboards/01f11533023f12d780a7ffde25c5f1b6/datasets/01f11546ca451f919f06f7bd47be8591_resolution_status"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 27,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "tsuuka-log-ichiran",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "e97e2643",
+                  "fields": [
+                    {
+                      "name": "call_date",
+                      "expression": "`call_date`"
+                    },
+                    {
+                      "name": "purpose",
+                      "expression": "`purpose`"
+                    },
+                    {
+                      "name": "trouble_type",
+                      "expression": "`trouble_type`"
+                    },
+                    {
+                      "name": "urgency_level",
+                      "expression": "`urgency_level`"
+                    },
+                    {
+                      "name": "resolution_status",
+                      "expression": "`resolution_status`"
+                    },
+                    {
+                      "name": "operator_action",
+                      "expression": "`operator_action`"
+                    },
+                    {
+                      "name": "transcript_summary",
+                      "expression": "`transcript_summary`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": false,
+                "title": ""
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "call_date",
+                    "headerTooltip": "通話日",
+                    "displayName": "通話日"
+                  },
+                  {
+                    "fieldName": "purpose",
+                    "headerTooltip": "問い合わせ目的（割引クレーム/返品交換/配送納期 等）",
+                    "displayName": "問い合わせ目的"
+                  },
+                  {
+                    "fieldName": "trouble_type",
+                    "headerTooltip": "トラブル要因（割引条件/サイズ/納期/品質/請求/なし）",
+                    "displayName": "トラブル要因"
+                  },
+                  {
+                    "fieldName": "urgency_level",
+                    "headerTooltip": "緊急度（高/中/低）",
+                    "displayName": "緊急度"
+                  },
+                  {
+                    "fieldName": "resolution_status",
+                    "headerTooltip": "解決状況（解決/未解決/エスカレーション）",
+                    "displayName": "解決状況"
+                  },
+                  {
+                    "fieldName": "operator_action",
+                    "headerTooltip": "オペレーターの対応内容",
+                    "displayName": "オペレーターの対応内容"
+                  },
+                  {
+                    "fieldName": "transcript_summary",
+                    "headerTooltip": "通話要約（ai_queryで事前生成、50文字以内）",
+                    "displayName": "通話要約"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 28,
+            "width": 12,
+            "height": 11
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "genieSpace": {
+      "isEnabled": true,
+      "overrideId": "01f1152a340d157c847caf80575a955d",
+      "enablementMode": "ENABLED"
+    },
+    "applyModeEnabled": false
+  }
+}
