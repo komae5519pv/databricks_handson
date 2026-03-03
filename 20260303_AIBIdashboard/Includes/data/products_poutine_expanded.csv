@@ -1,0 +1,27 @@
+product_id,category,subcategory,product_name,unit_price,unit_cost
+201,Poutine,Classic,Classic Cheese Curd Poutine,9.5,3.4
+202,Poutine,Classic,Smoky Gravy Poutine,10.0,3.7
+203,Poutine,Loaded,Bacon Lover's Poutine,12.5,4.8
+204,Poutine,Loaded,Pulled Pork Poutine,13.0,5.1
+205,Poutine,Loaded,Butter Chicken Poutine,13.5,5.4
+206,Poutine,Veggie,Mushroom & Thyme Poutine,12.0,4.6
+207,Poutine,Spicy,Spicy Paneer Poutine,12.5,4.9
+208,Poutine,Regional Specialties,Lobster Poutine (Halifax),17.0,8.2
+209,Poutine,Breakfast,Maple Sausage Breakfast Poutine,13.0,5.3
+210,Poutine,Spicy,Jalapeño Popper Poutine,12.75,5.0
+211,Poutine,Seasonal,Tourtière Poutine (QC),14.0,6.0
+212,Poutine,Dessert,Cinnamon Sugar Dessert Poutine,9.0,3.2
+213,Poutine,Kids,Mini Curds & Fries Poutine,6.5,2.4
+214,Poutine,Regional Specialties,Montreal Smoked Meat Poutine,14.5,6.2
+301,Sides,Fries,Extra Crispy Fries,4.5,1.6
+302,Sides,Curds,Cheese Curds (Side),5.0,2.1
+303,Sides,Gravy,Side of Gravy,2.0,0.6
+304,Sides,Onion Rings,Beer-Battered Onion Rings,5.5,2.3
+401,Drinks,Soft Drinks,Cola,2.5,0.7
+402,Drinks,Soft Drinks,Diet Cola,2.5,0.7
+403,Drinks,Bottled,Bottled Water,2.0,0.5
+404,Drinks,Milkshakes,Vanilla Milkshake,4.75,1.9
+501,Desserts,Baked Goods,Butter Tart,3.5,1.2
+502,Desserts,Ice Cream,Vanilla Soft Serve,3.75,1.4
+601,Combos,Meal Deal,Classic Poutine + Drink,11.0,4.8
+602,Combos,Family Pack,2 Poutines + 2 Sides,26.0,11.5
