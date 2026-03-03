@@ -210,15 +210,11 @@
 
 # COMMAND ----------
 
-spark.sql(f"""
-DECLARE OR REPLACE VARIABLE workspace_URL STRING;
-DECLARE OR REPLACE VARIABLE img_vol_path STRING
-""")
+spark.sql(f"""DECLARE OR REPLACE VARIABLE workspace_URL STRING""")
+spark.sql(f"""DECLARE OR REPLACE VARIABLE img_vol_path STRING""")
 
-spark.sql(f"""
-SET VAR workspace_URL = 'https://dbc-9a0a0e37-05e1.cloud.databricks.com';
-SET VAR img_vol_path = '/Volumes/labuser14024729_1772529614/poutine_aibi/corporate_images/poutine_corporate_icon.png'
-""")
+spark.sql(f"""SET VAR workspace_URL = 'https://e2-demo-field-eng.cloud.databricks.com'""")
+spark.sql(f"""SET VAR img_vol_path = '/Volumes/komae_demo_v4/aibi_workshop/raw/images/poutine_corporate_icon.png'""")
 
 spark.sql(f"""SELECT CONCAT(workspace_URL, '/ajax-api/2.0/fs/files/', img_vol_path) AS `Copy Image Path`""").display()
 
