@@ -8,7 +8,7 @@
 
 # DBTITLE 1,変数設定
 catalog_name = "komae_demo_v4"       # 任意のカタログ名に変更してください
-schema_name = "trade_area"           # 商圏分析用スキーマ
+schema_name = "trade_area"           # 任意のスキーマ名に変更してください
 
 # COMMAND ----------
 
