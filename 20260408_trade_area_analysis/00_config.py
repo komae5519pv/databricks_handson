@@ -7,7 +7,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,変数設定
-catalog_name = "komae_demo_v4"       # 任意のカタログ名に変更してください
+catalog_name = "YOUR_CATALOG_NAME"   # 任意のカタログ名に変更してください
 schema_name = "trade_area"           # 任意のスキーマ名に変更してください
 
 # COMMAND ----------

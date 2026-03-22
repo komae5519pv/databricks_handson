@@ -19,6 +19,17 @@ import requests
 
 app = FastAPI(title="Trade Area Analysis App")
 
+# ============================================================
+# Configuration (環境変数から読み込み、なければデフォルト値を使用)
+# ============================================================
+GENIE_SPACE_ID = os.environ.get("GENIE_SPACE_ID", "01f125245982136a801da22015caab4c")
+WAREHOUSE_ID = os.environ.get("DATABRICKS_WAREHOUSE_ID", "4b9b953939869799")
+CATALOG = os.environ.get("DATA_CATALOG", "komae_demo_v4")
+SCHEMA = os.environ.get("DATA_SCHEMA", "trade_area")
+
+# テーブル名のプレフィックス
+TABLE_PREFIX = f"{CATALOG}.{SCHEMA}"
+
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 ANALYSIS_CACHE_DIR = BASE_DIR / "analysis_cache"
@@ -80,12 +91,11 @@ class AnalysisRequest(BaseModel):
 # ============================================================
 def execute_query(query: str, return_columns: bool = False):
     """クエリを実行してデータを返す。return_columns=Trueの場合は(columns, data)のタプルを返す"""
-    warehouse_id = os.environ.get("DATABRICKS_WAREHOUSE_ID") or "4b9b953939869799"
-    print(f"[DEBUG] Using warehouse_id: {warehouse_id}")
+    print(f"[DEBUG] Using warehouse_id: {WAREHOUSE_ID}")
 
     try:
         result = w.statement_execution.execute_statement(
-            warehouse_id=warehouse_id,
+            warehouse_id=WAREHOUSE_ID,
             statement=query,
             wait_timeout="50s"
         )
@@ -152,8 +162,8 @@ def run_lv1_analysis(store_id: str) -> dict:
            ROUND(SUM(sm.sales_amount) / 10000, 0) as annual_sales_man,
            ROUND(AVG(sm.customer_count), 0) as avg_monthly_customers,
            ROUND(AVG(sm.avg_basket), 0) as avg_basket
-    FROM komae_demo_v4.trade_area.stores s
-    JOIN komae_demo_v4.trade_area.sales_monthly sm ON s.store_id = sm.store_id
+    FROM {TABLE_PREFIX}.stores s
+    JOIN {TABLE_PREFIX}.sales_monthly sm ON s.store_id = sm.store_id
     WHERE s.store_id = '{store_id}' AND YEAR(sm.month) = 2024
     GROUP BY s.store_id, s.store_name, s.prefecture, s.city, s.size_sqm, s.store_type, s.parking_capacity
     """
@@ -173,7 +183,7 @@ def run_lv1_analysis(store_id: str) -> dict:
     # 月次トレンド
     query = f"""
     SELECT month, sales_amount, yoy_change, customer_count, avg_basket
-    FROM komae_demo_v4.trade_area.sales_monthly WHERE store_id = '{store_id}' ORDER BY month
+    FROM {TABLE_PREFIX}.sales_monthly WHERE store_id = '{store_id}' ORDER BY month
     """
     rows = execute_query(query)
     results["monthly_trend"] = [
@@ -187,7 +197,7 @@ def run_lv1_analysis(store_id: str) -> dict:
     query = f"""
     SELECT population_5km, households, avg_income, elderly_rate, young_adult_rate,
            detached_house_rate, day_night_ratio, num_businesses
-    FROM komae_demo_v4.trade_area.trade_area WHERE store_id = '{store_id}'
+    FROM {TABLE_PREFIX}.trade_area WHERE store_id = '{store_id}'
     """
     rows = execute_query(query)
     if rows:
@@ -206,7 +216,7 @@ def run_lv1_analysis(store_id: str) -> dict:
     # 競合
     query = f"""
     SELECT competitor_name, distance_km, size_sqm, open_year, is_new_entry
-    FROM komae_demo_v4.trade_area.competitors WHERE store_id = '{store_id}' ORDER BY distance_km
+    FROM {TABLE_PREFIX}.competitors WHERE store_id = '{store_id}' ORDER BY distance_km
     """
     rows = execute_query(query)
     results["competitors"] = [
@@ -217,9 +227,9 @@ def run_lv1_analysis(store_id: str) -> dict:
     ]
 
     # 全店平均
-    query = """
+    query = f"""
     SELECT ROUND(AVG(yoy_change) * 100, 2), ROUND(AVG(sales_amount) / 10000 * 12, 0)
-    FROM komae_demo_v4.trade_area.sales_monthly WHERE YEAR(month) = 2024
+    FROM {TABLE_PREFIX}.sales_monthly WHERE YEAR(month) = 2024
     """
     rows = execute_query(query)
     if rows:
@@ -240,15 +250,15 @@ def run_lv2_analysis(store_id: str, lv1: dict) -> dict:
     query = f"""
     WITH store_sales AS (
         SELECT c.category_id, c.category_name, c.expenditure_mapping, SUM(sc.sales_amount) as sales
-        FROM komae_demo_v4.trade_area.sales_by_category sc
-        JOIN komae_demo_v4.trade_area.categories c ON sc.category_id = c.category_id
+        FROM {TABLE_PREFIX}.sales_by_category sc
+        JOIN {TABLE_PREFIX}.categories c ON sc.category_id = c.category_id
         WHERE sc.store_id = '{store_id}' AND YEAR(sc.month) = 2024
         GROUP BY c.category_id, c.category_name, c.expenditure_mapping
     ),
     avg_sales AS (
         SELECT c.category_id, c.category_name, SUM(sc.sales_amount) / COUNT(DISTINCT sc.store_id) as avg_sales
-        FROM komae_demo_v4.trade_area.sales_by_category sc
-        JOIN komae_demo_v4.trade_area.categories c ON sc.category_id = c.category_id
+        FROM {TABLE_PREFIX}.sales_by_category sc
+        JOIN {TABLE_PREFIX}.categories c ON sc.category_id = c.category_id
         WHERE YEAR(sc.month) = 2024 GROUP BY c.category_id, c.category_name
     )
     SELECT ss.category_name, ss.expenditure_mapping,
@@ -270,7 +280,7 @@ def run_lv2_analysis(store_id: str, lv1: dict) -> dict:
     SELECT expenditure_total, garden_plants, garden_supplies, pet_food, pet_supplies,
            housing_repair_total, furniture_household_total, household_durables,
            household_miscellaneous, construction_services
-    FROM komae_demo_v4.trade_area.trade_area_expenditure WHERE store_id = '{store_id}'
+    FROM {TABLE_PREFIX}.trade_area_expenditure WHERE store_id = '{store_id}'
     """
     rows = execute_query(query)
     if rows:
@@ -287,9 +297,9 @@ def run_lv2_analysis(store_id: str, lv1: dict) -> dict:
     # ハフモデル簡易推定
     query = f"""
     WITH all_stores AS (
-        SELECT 'self' as type, size_sqm, 0 as distance_km FROM komae_demo_v4.trade_area.stores WHERE store_id = '{store_id}'
+        SELECT 'self' as type, size_sqm, 0 as distance_km FROM {TABLE_PREFIX}.stores WHERE store_id = '{store_id}'
         UNION ALL
-        SELECT 'competitor', size_sqm, distance_km FROM komae_demo_v4.trade_area.competitors WHERE store_id = '{store_id}'
+        SELECT 'competitor', size_sqm, distance_km FROM {TABLE_PREFIX}.competitors WHERE store_id = '{store_id}'
     ),
     attraction AS (
         SELECT type, size_sqm, distance_km,
@@ -309,7 +319,7 @@ def run_lv2_analysis(store_id: str, lv1: dict) -> dict:
     # 近隣施設
     query = f"""
     SELECT facility_type, facility_name, distance_km, traffic_impact, opening_hours
-    FROM komae_demo_v4.trade_area.nearby_facilities WHERE store_id = '{store_id}' ORDER BY traffic_impact DESC
+    FROM {TABLE_PREFIX}.nearby_facilities WHERE store_id = '{store_id}' ORDER BY traffic_impact DESC
     """
     rows = execute_query(query)
     results["facilities"] = [
@@ -331,9 +341,9 @@ def run_lv3_analysis(store_id: str, lv1: dict, lv2: dict) -> dict:
     SELECT ss.similar_store_id, s.store_name, s.prefecture, s.city,
            ss.similarity_rank, ss.similarity_score,
            ROUND(AVG(sm.yoy_change) * 100, 1), ROUND(SUM(sm.sales_amount) / 10000, 0)
-    FROM komae_demo_v4.trade_area.similar_stores ss
-    JOIN komae_demo_v4.trade_area.stores s ON ss.similar_store_id = s.store_id
-    JOIN komae_demo_v4.trade_area.sales_monthly sm ON ss.similar_store_id = sm.store_id
+    FROM {TABLE_PREFIX}.similar_stores ss
+    JOIN {TABLE_PREFIX}.stores s ON ss.similar_store_id = s.store_id
+    JOIN {TABLE_PREFIX}.sales_monthly sm ON ss.similar_store_id = sm.store_id
     WHERE ss.store_id = '{store_id}' AND YEAR(sm.month) = 2024
     GROUP BY ss.similar_store_id, s.store_name, s.prefecture, s.city, ss.similarity_rank, ss.similarity_score
     ORDER BY ss.similarity_rank
@@ -353,14 +363,14 @@ def run_lv3_analysis(store_id: str, lv1: dict, lv2: dict) -> dict:
         query = f"""
         WITH target AS (
             SELECT c.category_name, SUM(sc.sales_amount) / 10000 as sales
-            FROM komae_demo_v4.trade_area.sales_by_category sc
-            JOIN komae_demo_v4.trade_area.categories c ON sc.category_id = c.category_id
+            FROM {TABLE_PREFIX}.sales_by_category sc
+            JOIN {TABLE_PREFIX}.categories c ON sc.category_id = c.category_id
             WHERE sc.store_id = '{store_id}' AND YEAR(sc.month) = 2024 GROUP BY c.category_name
         ),
         benchmark AS (
             SELECT c.category_name, SUM(sc.sales_amount) / 10000 as sales
-            FROM komae_demo_v4.trade_area.sales_by_category sc
-            JOIN komae_demo_v4.trade_area.categories c ON sc.category_id = c.category_id
+            FROM {TABLE_PREFIX}.sales_by_category sc
+            JOIN {TABLE_PREFIX}.categories c ON sc.category_id = c.category_id
             WHERE sc.store_id = '{similar_id}' AND YEAR(sc.month) = 2024 GROUP BY c.category_name
         )
         SELECT t.category_name, ROUND(t.sales, 0), ROUND(b.sales, 0), ROUND(b.sales - t.sales, 0)
@@ -377,7 +387,7 @@ def run_lv3_analysis(store_id: str, lv1: dict, lv2: dict) -> dict:
     query = f"""
     SELECT measure_type, description, status, expected_effect, actual_effect,
            start_date, end_date, related_categories, investment_amount
-    FROM komae_demo_v4.trade_area.store_measures WHERE store_id = '{store_id}' ORDER BY start_date DESC
+    FROM {TABLE_PREFIX}.store_measures WHERE store_id = '{store_id}' ORDER BY start_date DESC
     """
     rows = execute_query(query)
     results["measures"] = [
@@ -619,7 +629,11 @@ def get_current_user():
 def debug_info():
     """デバッグ用エンドポイント"""
     info = {
-        "warehouse_id": os.environ.get("DATABRICKS_WAREHOUSE_ID", "NOT_SET"),
+        "warehouse_id": WAREHOUSE_ID or "NOT_SET",
+        "genie_space_id": GENIE_SPACE_ID or "NOT_SET",
+        "catalog": CATALOG or "NOT_SET",
+        "schema": SCHEMA or "NOT_SET",
+        "table_prefix": TABLE_PREFIX,
         "host": os.environ.get("DATABRICKS_HOST", "NOT_SET"),
     }
     # テストクエリ
@@ -629,12 +643,12 @@ def debug_info():
         info["query_result"] = rows
 
         # 店舗クエリテスト
-        rows2 = execute_query("SELECT store_id, store_name FROM komae_demo_v4.trade_area.stores LIMIT 3")
+        rows2 = execute_query(f"SELECT store_id, store_name FROM {TABLE_PREFIX}.stores LIMIT 3")
         info["stores_test"] = "OK" if rows2 else "EMPTY"
         info["stores_sample"] = rows2[:3] if rows2 else []
 
         # 特定店舗クエリテスト
-        rows3 = execute_query("SELECT store_id, store_name FROM komae_demo_v4.trade_area.stores WHERE store_id = 'S025'")
+        rows3 = execute_query(f"SELECT store_id, store_name FROM {TABLE_PREFIX}.stores WHERE store_id = 'S025'")
         info["store_filter_test"] = "OK" if rows3 else "EMPTY"
         info["store_filter_result"] = rows3
     except Exception as e:
@@ -659,12 +673,12 @@ def get_store_overview_test(store_id: str):
 
 @app.get("/api/stores")
 def get_stores():
-    query = """
+    query = f"""
     SELECT s.store_id, s.store_name, s.prefecture, s.city,
            ROUND(AVG(sm.yoy_change), 3), ROUND(SUM(sm.sales_amount) / 10000, 0),
            s.latitude, s.longitude
-    FROM komae_demo_v4.trade_area.stores s
-    JOIN komae_demo_v4.trade_area.sales_monthly sm ON s.store_id = sm.store_id
+    FROM {TABLE_PREFIX}.stores s
+    JOIN {TABLE_PREFIX}.sales_monthly sm ON s.store_id = sm.store_id
     WHERE YEAR(sm.month) = 2024
     GROUP BY s.store_id, s.store_name, s.prefecture, s.city, s.latitude, s.longitude ORDER BY 5
     """
@@ -719,15 +733,15 @@ def get_business_overview(
 
     # 1. 全店舗KPI集計
     try:
-        kpi_query = """
+        kpi_query = f"""
         SELECT
             COUNT(DISTINCT s.store_id) as store_count,
             ROUND(SUM(sm.sales_amount) / 100000000, 2) as total_sales_oku,
             ROUND(AVG(sm.yoy_change) * 100, 1) as avg_yoy_pct,
             ROUND(AVG(sm.customer_count), 0) as avg_customers,
             ROUND(AVG(sm.avg_basket), 0) as avg_basket
-        FROM komae_demo_v4.trade_area.stores s
-        JOIN komae_demo_v4.trade_area.sales_monthly sm ON s.store_id = sm.store_id
+        FROM {TABLE_PREFIX}.stores s
+        JOIN {TABLE_PREFIX}.sales_monthly sm ON s.store_id = sm.store_id
         WHERE YEAR(sm.month) = 2024
         """
         rows = execute_query(kpi_query)
@@ -746,7 +760,7 @@ def get_business_overview(
 
     # 2. 健康度別店舗数
     try:
-        health_query = """
+        health_query = f"""
         SELECT
             CASE
                 WHEN AVG(yoy_change) >= 0 THEN 'healthy'
@@ -754,7 +768,7 @@ def get_business_overview(
                 ELSE 'critical'
             END as health_status,
             COUNT(*) as count
-        FROM komae_demo_v4.trade_area.sales_monthly
+        FROM {TABLE_PREFIX}.sales_monthly
         WHERE YEAR(month) = 2024
         GROUP BY store_id
         """
@@ -779,7 +793,7 @@ def get_business_overview(
                 trend_query = f"""
                 WITH store_health AS (
                     SELECT store_id, AVG(yoy_change) as avg_yoy
-                    FROM komae_demo_v4.trade_area.sales_monthly
+                    FROM {TABLE_PREFIX}.sales_monthly
                     WHERE YEAR(month) = 2024
                     GROUP BY store_id
                     HAVING {health_subquery}
@@ -788,8 +802,8 @@ def get_business_overview(
                        ROUND(SUM(sm.sales_amount) / 100000000, 2) as total_sales_oku,
                        ROUND(AVG(sm.yoy_change) * 100, 1) as avg_yoy_pct,
                        ROUND(SUM(sm.customer_count), 0) as total_customers
-                FROM komae_demo_v4.trade_area.sales_monthly sm
-                JOIN komae_demo_v4.trade_area.stores s ON sm.store_id = s.store_id
+                FROM {TABLE_PREFIX}.sales_monthly sm
+                JOIN {TABLE_PREFIX}.stores s ON sm.store_id = s.store_id
                 JOIN store_health sh ON sm.store_id = sh.store_id
                 WHERE YEAR(sm.month) = 2024
                 {' AND ' + ' AND '.join(trend_filter_conditions) if trend_filter_conditions else ''}
@@ -805,19 +819,19 @@ def get_business_overview(
                        ROUND(SUM(sm.sales_amount) / 100000000, 2) as total_sales_oku,
                        ROUND(AVG(sm.yoy_change) * 100, 1) as avg_yoy_pct,
                        ROUND(SUM(sm.customer_count), 0) as total_customers
-                FROM komae_demo_v4.trade_area.sales_monthly sm
-                JOIN komae_demo_v4.trade_area.stores s ON sm.store_id = s.store_id
+                FROM {TABLE_PREFIX}.sales_monthly sm
+                JOIN {TABLE_PREFIX}.stores s ON sm.store_id = s.store_id
                 WHERE {where_clause}
                 GROUP BY sm.month
                 ORDER BY sm.month
                 """
         else:
-            trend_query = """
+            trend_query = f"""
             SELECT month,
                    ROUND(SUM(sales_amount) / 100000000, 2) as total_sales_oku,
                    ROUND(AVG(yoy_change) * 100, 1) as avg_yoy_pct,
                    ROUND(SUM(customer_count), 0) as total_customers
-            FROM komae_demo_v4.trade_area.sales_monthly
+            FROM {TABLE_PREFIX}.sales_monthly
             WHERE YEAR(month) = 2024
             GROUP BY month
             ORDER BY month
@@ -842,13 +856,13 @@ def get_business_overview(
 
     # 4. 店舗ランキング（TOP10 / WORST10）
     try:
-        ranking_query = """
+        ranking_query = f"""
         SELECT s.store_id, s.store_name, s.prefecture, s.city,
                ROUND(AVG(sm.yoy_change) * 100, 1) as yoy_pct,
                ROUND(SUM(sm.sales_amount) / 10000, 0) as sales_man,
                s.latitude, s.longitude
-        FROM komae_demo_v4.trade_area.stores s
-        JOIN komae_demo_v4.trade_area.sales_monthly sm ON s.store_id = sm.store_id
+        FROM {TABLE_PREFIX}.stores s
+        JOIN {TABLE_PREFIX}.sales_monthly sm ON s.store_id = sm.store_id
         WHERE YEAR(sm.month) = 2024
         GROUP BY s.store_id, s.store_name, s.prefecture, s.city, s.latitude, s.longitude
         ORDER BY yoy_pct DESC
@@ -873,13 +887,13 @@ def get_business_overview(
 
     # 5. 地域別集計
     try:
-        region_query = """
+        region_query = f"""
         SELECT s.prefecture,
                COUNT(DISTINCT s.store_id) as store_count,
                ROUND(SUM(sm.sales_amount) / 100000000, 2) as sales_oku,
                ROUND(AVG(sm.yoy_change) * 100, 1) as avg_yoy_pct
-        FROM komae_demo_v4.trade_area.stores s
-        JOIN komae_demo_v4.trade_area.sales_monthly sm ON s.store_id = sm.store_id
+        FROM {TABLE_PREFIX}.stores s
+        JOIN {TABLE_PREFIX}.sales_monthly sm ON s.store_id = sm.store_id
         WHERE YEAR(sm.month) = 2024
         GROUP BY s.prefecture
         ORDER BY sales_oku DESC
@@ -935,7 +949,7 @@ def get_analysis_result(store_id: str):
 @app.get("/api/stores/{store_id}/metrics")
 def get_store_metrics(store_id: str):
     query = f"""
-    SELECT month, sales_amount, yoy_change FROM komae_demo_v4.trade_area.sales_monthly
+    SELECT month, sales_amount, yoy_change FROM {TABLE_PREFIX}.sales_monthly
     WHERE store_id = '{store_id}' ORDER BY month
     """
     rows = execute_query(query)
@@ -958,7 +972,7 @@ def get_store_overview(store_id: str):
         store_query = f"""
         SELECT s.store_id, s.store_name, s.prefecture, s.city, s.size_sqm, s.store_type, s.parking_capacity,
                s.latitude, s.longitude
-        FROM komae_demo_v4.trade_area.stores s
+        FROM {TABLE_PREFIX}.stores s
         WHERE s.store_id = '{store_id}'
         """
         store_rows = execute_query(store_query)
@@ -982,7 +996,7 @@ def get_store_overview(store_id: str):
         sales_query = f"""
         SELECT ROUND(AVG(yoy_change) * 100, 2), ROUND(SUM(sales_amount) / 10000, 0),
                ROUND(AVG(customer_count), 0), ROUND(AVG(avg_basket), 0)
-        FROM komae_demo_v4.trade_area.sales_monthly
+        FROM {TABLE_PREFIX}.sales_monthly
         WHERE store_id = '{store_id}' AND YEAR(month) = 2024
         """
         sales_rows = execute_query(sales_query)
@@ -1003,9 +1017,9 @@ def get_store_overview(store_id: str):
 
     # 3. 全店平均
     try:
-        chain_query = """
+        chain_query = f"""
         SELECT ROUND(AVG(yoy_change) * 100, 2), ROUND(AVG(sales_amount) / 10000 * 12, 0)
-        FROM komae_demo_v4.trade_area.sales_monthly WHERE YEAR(month) = 2024
+        FROM {TABLE_PREFIX}.sales_monthly WHERE YEAR(month) = 2024
         """
         chain_rows = execute_query(chain_query)
         if chain_rows:
@@ -1020,7 +1034,7 @@ def get_store_overview(store_id: str):
     try:
         demo_query = f"""
         SELECT population_5km, households, avg_income, elderly_rate, young_adult_rate, detached_house_rate
-        FROM komae_demo_v4.trade_area.trade_area WHERE store_id = '{store_id}'
+        FROM {TABLE_PREFIX}.trade_area WHERE store_id = '{store_id}'
         """
         demo_rows = execute_query(demo_query)
         if demo_rows:
@@ -1037,7 +1051,7 @@ def get_store_overview(store_id: str):
     try:
         comp_query = f"""
         SELECT competitor_name, distance_km, size_sqm, is_new_entry
-        FROM komae_demo_v4.trade_area.competitors WHERE store_id = '{store_id}' ORDER BY distance_km LIMIT 8
+        FROM {TABLE_PREFIX}.competitors WHERE store_id = '{store_id}' ORDER BY distance_km LIMIT 8
         """
         comp_rows = execute_query(comp_query)
         print(f"[DEBUG] Competitors query returned {len(comp_rows)} rows for {store_id}")
@@ -1061,7 +1075,7 @@ def get_store_overview(store_id: str):
     try:
         fac_query = f"""
         SELECT facility_name, facility_type, distance_km, traffic_impact
-        FROM komae_demo_v4.trade_area.nearby_facilities WHERE store_id = '{store_id}' ORDER BY distance_km LIMIT 10
+        FROM {TABLE_PREFIX}.nearby_facilities WHERE store_id = '{store_id}' ORDER BY distance_km LIMIT 10
         """
         fac_rows = execute_query(fac_query)
         print(f"[DEBUG] Facilities query returned {len(fac_rows)} rows for {store_id}")
@@ -1079,8 +1093,8 @@ def get_store_overview(store_id: str):
     try:
         cat_query = f"""
         SELECT c.category_name, ROUND(SUM(sc.sales_amount) / 10000, 0) as sales_man
-        FROM komae_demo_v4.trade_area.sales_by_category sc
-        JOIN komae_demo_v4.trade_area.categories c ON sc.category_id = c.category_id
+        FROM {TABLE_PREFIX}.sales_by_category sc
+        JOIN {TABLE_PREFIX}.categories c ON sc.category_id = c.category_id
         WHERE sc.store_id = '{store_id}' AND YEAR(sc.month) = 2024
         GROUP BY c.category_name ORDER BY sales_man DESC LIMIT 5
         """
@@ -1097,7 +1111,7 @@ def get_store_overview(store_id: str):
     try:
         trend_query = f"""
         SELECT month, sales_amount, yoy_change, customer_count
-        FROM komae_demo_v4.trade_area.sales_monthly WHERE store_id = '{store_id}' ORDER BY month
+        FROM {TABLE_PREFIX}.sales_monthly WHERE store_id = '{store_id}' ORDER BY month
         """
         trend_rows = execute_query(trend_query)
         result["monthly_trend"] = [
@@ -1184,8 +1198,8 @@ def _get_store_overview_from_db(store_id: str):
            ROUND(AVG(sm.customer_count), 0) as avg_monthly_customers,
            ROUND(AVG(sm.avg_basket), 0) as avg_basket,
            s.latitude, s.longitude
-    FROM komae_demo_v4.trade_area.stores s
-    JOIN komae_demo_v4.trade_area.sales_monthly sm ON s.store_id = sm.store_id
+    FROM {TABLE_PREFIX}.stores s
+    JOIN {TABLE_PREFIX}.sales_monthly sm ON s.store_id = sm.store_id
     WHERE s.store_id = '{store_id}' AND YEAR(sm.month) = 2024
     GROUP BY s.store_id, s.store_name, s.prefecture, s.city, s.size_sqm, s.store_type, s.parking_capacity, s.latitude, s.longitude
     """
@@ -1208,9 +1222,9 @@ def _get_store_overview_from_db(store_id: str):
         print(f"[DEBUG] No store data found for {store_id}")
 
     # 全店平均
-    query = """
+    query = f"""
     SELECT ROUND(AVG(yoy_change) * 100, 2), ROUND(AVG(sales_amount) / 10000 * 12, 0)
-    FROM komae_demo_v4.trade_area.sales_monthly WHERE YEAR(month) = 2024
+    FROM {TABLE_PREFIX}.sales_monthly WHERE YEAR(month) = 2024
     """
     rows = execute_query(query)
     if rows:
@@ -1223,7 +1237,7 @@ def _get_store_overview_from_db(store_id: str):
     query = f"""
     SELECT population_5km, households, avg_income, elderly_rate, young_adult_rate,
            detached_house_rate, day_night_ratio
-    FROM komae_demo_v4.trade_area.trade_area WHERE store_id = '{store_id}'
+    FROM {TABLE_PREFIX}.trade_area WHERE store_id = '{store_id}'
     """
     rows = execute_query(query)
     if rows:
@@ -1241,7 +1255,7 @@ def _get_store_overview_from_db(store_id: str):
     # 競合
     query = f"""
     SELECT competitor_name, distance_km, size_sqm, is_new_entry
-    FROM komae_demo_v4.trade_area.competitors WHERE store_id = '{store_id}' ORDER BY distance_km LIMIT 8
+    FROM {TABLE_PREFIX}.competitors WHERE store_id = '{store_id}' ORDER BY distance_km LIMIT 8
     """
     rows = execute_query(query)
     result["competitors"] = [
@@ -1266,7 +1280,7 @@ def _get_store_overview_from_db(store_id: str):
     }
     query = f"""
     SELECT facility_name, facility_type, distance_km, traffic_impact
-    FROM komae_demo_v4.trade_area.nearby_facilities WHERE store_id = '{store_id}' ORDER BY distance_km LIMIT 10
+    FROM {TABLE_PREFIX}.nearby_facilities WHERE store_id = '{store_id}' ORDER BY distance_km LIMIT 10
     """
     rows = execute_query(query)
     result["facilities"] = [
@@ -1284,8 +1298,8 @@ def _get_store_overview_from_db(store_id: str):
     query = f"""
     WITH store_sales AS (
         SELECT c.category_name, SUM(sc.sales_amount) as sales
-        FROM komae_demo_v4.trade_area.sales_by_category sc
-        JOIN komae_demo_v4.trade_area.categories c ON sc.category_id = c.category_id
+        FROM {TABLE_PREFIX}.sales_by_category sc
+        JOIN {TABLE_PREFIX}.categories c ON sc.category_id = c.category_id
         WHERE sc.store_id = '{store_id}' AND YEAR(sc.month) = 2024
         GROUP BY c.category_name
     )
@@ -1300,7 +1314,7 @@ def _get_store_overview_from_db(store_id: str):
     # 月次トレンド
     query = f"""
     SELECT month, sales_amount, yoy_change, customer_count
-    FROM komae_demo_v4.trade_area.sales_monthly WHERE store_id = '{store_id}' ORDER BY month
+    FROM {TABLE_PREFIX}.sales_monthly WHERE store_id = '{store_id}' ORDER BY month
     """
     rows = execute_query(query)
     result["monthly_trend"] = [
@@ -1322,8 +1336,8 @@ def _get_store_overview_from_db(store_id: str):
                AVG(sm.customer_count) as avg_monthly_customers,
                AVG(sm.avg_basket) as avg_basket,
                s.latitude, s.longitude
-        FROM komae_demo_v4.trade_area.stores s
-        LEFT JOIN komae_demo_v4.trade_area.sales_monthly sm ON s.store_id = sm.store_id
+        FROM {TABLE_PREFIX}.stores s
+        LEFT JOIN {TABLE_PREFIX}.sales_monthly sm ON s.store_id = sm.store_id
         WHERE s.store_id = '{store_id}'
         GROUP BY s.store_id, s.store_name, s.prefecture, s.city, s.size_sqm, s.store_type, s.parking_capacity, s.latitude, s.longitude
         """
@@ -1375,7 +1389,6 @@ def _get_store_overview_from_db(store_id: str):
 # ============================================================
 # Genie API Endpoints (SDK genie メソッド使用 - AI Dev Kit 方式)
 # ============================================================
-GENIE_SPACE_ID = "01f125245982136a801da22015caab4c"
 
 class GenieMessageRequest(BaseModel):
     message: str

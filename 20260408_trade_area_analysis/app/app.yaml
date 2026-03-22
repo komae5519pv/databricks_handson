@@ -6,7 +6,16 @@ command:
   - --port
   - 8000
 
-# ユーザー認証でGenie APIにアクセスするためのスコープ
+env:
+  - name: 'GENIE_SPACE_ID'
+    value: '<GenieスペースID>'
+  - name: 'DATABRICKS_WAREHOUSE_ID'
+    value: '<WAREHOUSE_ID>'
+  - name: 'DATA_CATALOG'
+    value: '<カタログ名>'
+  - name: 'DATA_SCHEMA'
+    value: 'trade_area'
+
 user_api_scopes:
   - dashboards
   - sql
