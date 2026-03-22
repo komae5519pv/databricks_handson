@@ -1,0 +1,2293 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>AI Store Doctor | DCM商圏分析</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // marked の初期設定とフォールバック
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                headerIds: false,
+                mangle: false
+            });
+        }
+        // markedが読み込まれなかった場合のフォールバック関数
+        window.safeMarkdownParse = function(text) {
+            if (!text) return '';
+            try {
+                if (typeof marked !== 'undefined' && marked.parse) {
+                    return marked.parse(text);
+                }
+            } catch (e) {
+                console.error('Marked parse error:', e);
+            }
+            // フォールバック: 基本的なマークダウン変換
+            return text
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+        };
+    </script>
+    <!-- Leaflet for maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --accent: #10b981; --warning: #f59e0b; --danger: #ef4444; }
+        body { font-family: 'Outfit', 'Noto Sans JP', sans-serif; background: #0a0a0f; }
+        .glow-green { box-shadow: 0 0 30px rgba(16, 185, 129, 0.3); }
+        .glow-amber { box-shadow: 0 0 30px rgba(245, 158, 11, 0.3); }
+        .glow-red { box-shadow: 0 0 30px rgba(239, 68, 68, 0.3); }
+        @keyframes pulse-glow { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .pulse { animation: pulse-glow 2s ease-in-out infinite; }
+        .gradient-text { background: linear-gradient(135deg, #10b981, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .card { background: linear-gradient(145deg, rgba(30, 30, 40, 0.8), rgba(20, 20, 30, 0.9)); border: 1px solid rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); overflow: visible; }
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .spinner { animation: rotate 1s linear infinite; }
+        .markdown-content h2 { font-size: 1.5rem; font-weight: 700; margin: 1.5rem 0 0.75rem 0; color: #10b981; }
+        .markdown-content h3 { font-size: 1.25rem; font-weight: 600; margin: 1.25rem 0 0.5rem 0; color: #60a5fa; }
+        .markdown-content p { margin: 0.5rem 0; line-height: 1.7; }
+        .markdown-content ul, .markdown-content ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+        .markdown-content li { margin: 0.25rem 0; }
+        .markdown-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .markdown-content th, .markdown-content td { border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem; text-align: left; }
+        .markdown-content th { background: rgba(16, 185, 129, 0.2); }
+        .markdown-content strong { color: #fbbf24; }
+        /* Genie チャット用スタイル */
+        .genie-response { line-height: 1.6; }
+        .genie-response p { margin: 0.25rem 0; }
+        .genie-response strong { color: #fbbf24; }
+        .genie-response table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.8rem; }
+        .genie-response th, .genie-response td { border: 1px solid rgba(255,255,255,0.15); padding: 0.4rem 0.6rem; text-align: left; }
+        .genie-response th { background: rgba(16, 185, 129, 0.25); color: #10b981; font-weight: 600; }
+        .genie-response tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+        .genie-response code { background: rgba(255,255,255,0.1); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85em; }
+        .genie-response pre { background: rgba(0,0,0,0.3); padding: 0.75rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+        .genie-response pre code { background: none; padding: 0; }
+        .genie-response details { margin: 0.5rem 0; }
+        .genie-response summary { cursor: pointer; color: #60a5fa; font-size: 0.9em; }
+        .genie-response summary:hover { color: #93c5fd; }
+        .genie-response em { color: rgba(255,255,255,0.6); font-style: italic; }
+    </style>
+</head>
+<body class="text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // VERSION: 2.0 - Tooltip removed from chart, hover info in title bar
+        console.log('AI Store Doctor v2.0 loaded - tooltip in title bar');
+        const { useState, useEffect, useRef } = React;
+        const { createPortal } = ReactDOM;
+
+        const calculateHealth = (yoyChange) => {
+            const score = Math.max(0, Math.min(100, 50 + yoyChange * 200));
+            if (score >= 60) return { score, status: 'healthy', color: 'emerald', label: '良好' };
+            if (score >= 40) return { score, status: 'caution', color: 'amber', label: '要注意' };
+            return { score, status: 'critical', color: 'red', label: '要治療' };
+        };
+
+        const CircularProgress = ({ value, size = 80, color = 'emerald' }) => {
+            const strokeWidth = 6;
+            const radius = (size - strokeWidth) / 2;
+            const circumference = radius * 2 * Math.PI;
+            const offset = circumference - (value / 100) * circumference;
+            const colors = { emerald: '#10b981', amber: '#f59e0b', red: '#ef4444', blue: '#3b82f6' };
+            return (
+                <svg width={size} height={size} className="transform -rotate-90">
+                    <circle cx={size/2} cy={size/2} r={radius} stroke="rgba(255,255,255,0.1)" strokeWidth={strokeWidth} fill="none" />
+                    <circle cx={size/2} cy={size/2} r={radius} stroke={colors[color]} strokeWidth={strokeWidth}
+                        fill="none" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset}
+                        style={{ transition: 'stroke-dashoffset 0.5s ease' }} />
+                </svg>
+            );
+        };
+
+        const MiniChart = ({ data, width = 200, height = 60, showAxis = true }) => {
+            if (!data || data.length === 0) return null;
+            const values = data.map(d => d.sales);
+            const max = Math.max(...values);
+            const min = Math.min(...values);
+            const range = max - min || 1;
+            const padding = 5;
+            const chartWidth = width - padding * 2;
+            const chartHeight = height - padding * 2;
+
+            const points = data.map((d, i) => {
+                const x = padding + (i / (data.length - 1)) * chartWidth;
+                const y = padding + chartHeight - ((d.sales - min) / range) * chartHeight;
+                return { x, y, ...d };
+            });
+
+            const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+            const areaD = pathD + ` L ${points[points.length-1].x} ${height - padding} L ${padding} ${height - padding} Z`;
+
+            return (
+                <svg width={width} height={height}>
+                    <defs>
+                        <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
+                            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                        </linearGradient>
+                    </defs>
+                    <path d={areaD} fill="url(#chartGradient)" />
+                    <path d={pathD} fill="none" stroke="#3b82f6" strokeWidth="2" />
+                    {points.map((p, i) => (
+                        <circle key={i} cx={p.x} cy={p.y} r="3" fill="#3b82f6" />
+                    ))}
+                </svg>
+            );
+        };
+
+        const BarChart = ({ data, width = 200, height = 120 }) => {
+            if (!data || data.length === 0) return null;
+            const max = Math.max(...data.map(d => d.sales_man));
+            const barWidth = (width - 20) / data.length - 4;
+
+            return (
+                <svg width={width} height={height}>
+                    {data.map((d, i) => {
+                        const barHeight = (d.sales_man / max) * (height - 30);
+                        const x = 10 + i * (barWidth + 4);
+                        const y = height - 20 - barHeight;
+                        return (
+                            <g key={i}>
+                                <rect x={x} y={y} width={barWidth} height={barHeight} fill="#10b981" rx="2" />
+                                <text x={x + barWidth/2} y={height - 5} textAnchor="middle" fill="rgba(255,255,255,0.5)" fontSize="8">
+                                    {d.category.slice(0, 4)}
+                                </text>
+                            </g>
+                        );
+                    })}
+                </svg>
+            );
+        };
+
+        const StoreCard = ({ store, isSelected, onClick, analysisStatus }) => {
+            const health = calculateHealth(store.yoy_change);
+            const glowClass = health.color === 'emerald' ? 'hover:glow-green' : health.color === 'amber' ? 'hover:glow-amber' : 'hover:glow-red';
+            return (
+                <div onClick={onClick} className={`card rounded-xl p-4 cursor-pointer transition-all duration-300 ${glowClass} ${isSelected ? 'ring-2 ring-emerald-500' : ''}`}>
+                    <div className="flex items-center gap-4">
+                        {/* 健康度スコア（ツールチップ付き） */}
+                        <div className="relative group"
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseEnter={(e) => e.stopPropagation()}
+                        >
+                            <CircularProgress value={health.score} size={60} color={health.color} />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <span className="text-lg font-bold">{Math.round(health.score)}</span>
+                            </div>
+                            {/* ツールチップ（右側に表示） */}
+                            <div className="absolute left-full top-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[9999]">
+                                <div className="bg-gray-900 border border-white/20 rounded-lg p-3 shadow-xl min-w-[200px]">
+                                    <div className="text-sm font-semibold text-white mb-2">📊 健康度スコア</div>
+                                    <div className="space-y-1.5 text-xs">
+                                        <div className="flex justify-between">
+                                            <span className="text-white/50">前年比 (YoY)</span>
+                                            <span className={`font-medium ${store.yoy_change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                {store.yoy_change >= 0 ? '+' : ''}{(store.yoy_change * 100).toFixed(1)}%
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-white/50">スコア</span>
+                                            <span className="font-medium text-white">{Math.round(health.score)} / 100</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-white/50">判定</span>
+                                            <span className={`font-medium ${health.color === 'emerald' ? 'text-emerald-400' : health.color === 'amber' ? 'text-amber-400' : 'text-red-400'}`}>{health.label}</span>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2 pt-2 border-t border-white/10 text-xs text-white/40">
+                                        計算式: 50 + (YoY × 200)
+                                    </div>
+                                    {/* 矢印（左向き・上寄せ） */}
+                                    <div className="absolute -left-1.5 top-4 w-3 h-3 bg-gray-900 border-l border-b border-white/20 rotate-45"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="font-semibold truncate">{store.store_name}</div>
+                            <div className="text-sm text-white/50">{store.prefecture} {store.city}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${health.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-400' : health.color === 'amber' ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
+                                    {health.label}
+                                </span>
+                                {analysisStatus === 'completed' && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">分析済</span>}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const PhaseIndicator = ({ currentPhase, progress }) => {
+            const phases = [
+                { id: 'lv1', label: 'Lv1 基礎分析' },
+                { id: 'lv2', label: 'Lv2 深掘分析' },
+                { id: 'lv3', label: 'Lv3 施策立案' },
+                { id: 'ai_synthesis', label: 'AI総合診断' }
+            ];
+            const currentIdx = phases.findIndex(p => p.id === currentPhase);
+            return (
+                <div className="space-y-3">
+                    {phases.map((phase, idx) => (
+                        <div key={phase.id} className={`flex items-center gap-3 p-2 rounded-lg ${idx === currentIdx ? 'bg-emerald-500/20' : idx < currentIdx ? 'bg-white/5' : 'opacity-40'}`}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx < currentIdx ? 'bg-emerald-500' : idx === currentIdx ? 'bg-emerald-500/50 pulse' : 'bg-white/10'}`}>
+                                {idx < currentIdx ? '✓' : idx + 1}
+                            </div>
+                            <span className="text-sm">{phase.label}</span>
+                            {idx === currentIdx && <div className="spinner w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full ml-auto" />}
+                        </div>
+                    ))}
+                    <div className="h-2 bg-white/10 rounded-full overflow-hidden mt-3">
+                        <div className="h-full bg-gradient-to-r from-emerald-500 to-blue-500 transition-all" style={{ width: `${progress}%` }} />
+                    </div>
+                </div>
+            );
+        };
+
+        // マップコンポーネント（トグル機能付き）
+        const StoreMap = ({ lat, lng, storeName, competitors, facilities }) => {
+            const mapRef = useRef(null);
+            const mapInstanceRef = useRef(null);
+            const markersRef = useRef({ competitors: [], facilities: [] });
+            const [showCompetitors, setShowCompetitors] = useState(true);
+            const [showFacilities, setShowFacilities] = useState(false);
+            const storeLatRef = useRef(null);
+            const storeLngRef = useRef(null);
+
+            // 施設タイプ別のアイコン設定
+            const facilityIcons = {
+                station: { color: '#f59e0b', icon: '🚃', label: '駅' },
+                school: { color: '#3b82f6', icon: '🏫', label: '学校' },
+                hospital: { color: '#ef4444', icon: '🏥', label: '病院' },
+                park: { color: '#22c55e', icon: '🌳', label: '公園' },
+                commercial: { color: '#ec4899', icon: '🏬', label: '商業' },
+                supermarket: { color: '#14b8a6', icon: '🛒', label: 'スーパー' },
+                convenience: { color: '#06b6d4', icon: '🏪', label: 'コンビニ' },
+                government: { color: '#64748b', icon: '🏛️', label: '行政' },
+                bank: { color: '#6366f1', icon: '🏦', label: '銀行' },
+                post: { color: '#f97316', icon: '📮', label: '郵便局' },
+                other: { color: '#94a3b8', icon: '📍', label: '施設' }
+            };
+
+            // マップ初期化
+            useEffect(() => {
+                if (!mapRef.current) return;
+
+                // 既存のマップがあれば削除
+                if (mapInstanceRef.current) {
+                    mapInstanceRef.current.remove();
+                    mapInstanceRef.current = null;
+                }
+
+                const storeLat = lat || 35.6595;
+                const storeLng = lng || 139.7004;
+                storeLatRef.current = storeLat;
+                storeLngRef.current = storeLng;
+
+                const map = L.map(mapRef.current, {
+                    zoomControl: false,
+                    attributionControl: false,
+                    preferCanvas: true  // パフォーマンス向上
+                }).setView([storeLat, storeLng], 14);
+
+                // OpenStreetMapを使用（より安定）
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: ''
+                }).addTo(map);
+
+                // 当店舗マーカー
+                const storeIcon = L.divIcon({
+                    className: 'custom-marker',
+                    html: '<div style="background: #10b981; width: 28px; height: 28px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 12px rgba(16,185,129,0.5); display:flex; align-items:center; justify-content:center; font-size:14px;">🏠</div>',
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                });
+                const storeMarker = L.marker([storeLat, storeLng], { icon: storeIcon }).addTo(map);
+                storeMarker.bindPopup(`<div style="font-family:sans-serif;"><b style="color:#10b981;font-size:14px;">${storeName}</b><br/><span style="color:#666;">当店舗</span></div>`);
+                storeMarker.on('mouseover', function() { this.openPopup(); });
+
+                // 5km圏円
+                L.circle([storeLat, storeLng], {
+                    radius: 5000,
+                    color: '#10b981',
+                    fillColor: '#10b981',
+                    fillOpacity: 0.08,
+                    weight: 2,
+                    dashArray: '5, 5'
+                }).addTo(map);
+
+                // 3km圏円
+                L.circle([storeLat, storeLng], {
+                    radius: 3000,
+                    color: '#3b82f6',
+                    fillColor: '#3b82f6',
+                    fillOpacity: 0.05,
+                    weight: 1,
+                    dashArray: '3, 3'
+                }).addTo(map);
+
+                mapInstanceRef.current = map;
+
+                // サイズ調整を遅延実行（タイル読み込み安定化）
+                setTimeout(() => {
+                    if (mapInstanceRef.current) {
+                        mapInstanceRef.current.invalidateSize();
+                    }
+                }, 100);
+                setTimeout(() => {
+                    if (mapInstanceRef.current) {
+                        mapInstanceRef.current.invalidateSize();
+                    }
+                }, 500);
+
+                // ResizeObserverでコンテナサイズ変更を監視
+                const resizeObserver = new ResizeObserver(() => {
+                    if (mapInstanceRef.current) {
+                        mapInstanceRef.current.invalidateSize();
+                    }
+                });
+                resizeObserver.observe(mapRef.current);
+
+                return () => {
+                    resizeObserver.disconnect();
+                    if (mapInstanceRef.current) {
+                        mapInstanceRef.current.remove();
+                        mapInstanceRef.current = null;
+                    }
+                };
+            }, [storeName]);
+
+            // 競合マーカーの更新
+            useEffect(() => {
+                const map = mapInstanceRef.current;
+                if (!map) return;
+
+                // 既存の競合マーカーを削除
+                markersRef.current.competitors.forEach(m => map.removeLayer(m));
+                markersRef.current.competitors = [];
+
+                if (showCompetitors && competitors) {
+                    const storeLat = storeLatRef.current;
+                    const storeLng = storeLngRef.current;
+
+                    competitors.forEach((c, i) => {
+                        const angle = (i / competitors.length) * Math.PI * 2 + 0.5;
+                        const dist = c.distance_km * 0.009;
+                        const markerLat = storeLat + Math.cos(angle) * dist;
+                        const markerLng = storeLng + Math.sin(angle) * dist * 1.2;
+
+                        const color = c.is_new_entry ? '#ef4444' : '#6b7280';
+                        const icon = L.divIcon({
+                            className: 'custom-marker',
+                            html: `<div style="background:${color}; width:20px; height:20px; border-radius:50%; border:2px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; font-size:10px;">🏪</div>`,
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        });
+
+                        const marker = L.marker([markerLat, markerLng], { icon }).addTo(map);
+                        const popupContent = `
+                            <div style="font-family:sans-serif; min-width:140px;">
+                                <b style="color:${color}; font-size:13px;">${c.name}</b>
+                                ${c.is_new_entry ? '<span style="background:#ef4444; color:white; padding:1px 6px; border-radius:4px; font-size:10px; margin-left:6px;">NEW</span>' : ''}
+                                <div style="margin-top:6px; font-size:11px; color:#666;">
+                                    <div>📍 距離: <b>${c.distance_km}km</b></div>
+                                    <div>📐 売場: <b>${c.size_sqm?.toLocaleString()}㎡</b></div>
+                                </div>
+                            </div>
+                        `;
+                        marker.bindPopup(popupContent);
+                        marker.on('mouseover', function() { this.openPopup(); });
+                        markersRef.current.competitors.push(marker);
+                    });
+                }
+            }, [showCompetitors, competitors]);
+
+            // 施設マーカーの更新
+            useEffect(() => {
+                const map = mapInstanceRef.current;
+                if (!map) return;
+
+                // 既存の施設マーカーを削除
+                markersRef.current.facilities.forEach(m => map.removeLayer(m));
+                markersRef.current.facilities = [];
+
+                if (showFacilities && facilities) {
+                    const storeLat = storeLatRef.current;
+                    const storeLng = storeLngRef.current;
+
+                    facilities.forEach((f, i) => {
+                        const angle = (i / facilities.length) * Math.PI * 2;
+                        const dist = f.distance_km * 0.009;
+                        const markerLat = storeLat + Math.cos(angle) * dist;
+                        const markerLng = storeLng + Math.sin(angle) * dist * 1.2;
+
+                        const typeInfo = facilityIcons[f.type] || { color: '#94a3b8', icon: '📍', label: '施設' };
+                        const icon = L.divIcon({
+                            className: 'custom-marker',
+                            html: `<div style="background:${typeInfo.color}; width:22px; height:22px; border-radius:6px; border:2px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; font-size:12px;">${typeInfo.icon}</div>`,
+                            iconSize: [22, 22],
+                            iconAnchor: [11, 11]
+                        });
+
+                        const marker = L.marker([markerLat, markerLng], { icon }).addTo(map);
+
+                        // 施設の詳細情報（DBからの実データ対応）
+                        const labelText = f.type_label || typeInfo.label;
+                        let details = `📍 距離: <b>${f.distance_km}km</b>`;
+                        if (f.traffic_impact) details += `<br/>📊 集客影響: <b>${(f.traffic_impact * 100).toFixed(0)}%</b>`;
+                        if (f.daily_passengers) details += `<br/>👥 乗降客: <b>${(f.daily_passengers/10000).toFixed(1)}万人/日</b>`;
+                        if (f.area_sqm) details += `<br/>📐 面積: <b>${(f.area_sqm/10000).toFixed(1)}万㎡</b>`;
+
+                        const popupContent = `
+                            <div style="font-family:sans-serif; min-width:140px;">
+                                <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+                                    <span style="background:${typeInfo.color}; padding:2px 8px; border-radius:4px; font-size:10px; color:white;">${labelText}</span>
+                                    <b style="font-size:13px;">${f.name}</b>
+                                </div>
+                                <div style="font-size:11px; color:#666;">${details}</div>
+                            </div>
+                        `;
+                        marker.bindPopup(popupContent);
+                        marker.on('mouseover', function() { this.openPopup(); });
+                        markersRef.current.facilities.push(marker);
+                    });
+                }
+            }, [showFacilities, facilities]);
+
+            return (
+                <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                    {/* トグルボタン - インラインスタイルで確実に表示 */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '8px',
+                        left: '8px',
+                        zIndex: 9999,
+                        display: 'flex',
+                        gap: '4px',
+                        pointerEvents: 'auto'
+                    }}>
+                        <button
+                            onClick={() => setShowCompetitors(!showCompetitors)}
+                            style={{
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: showCompetitors ? '#4b5563' : 'rgba(0,0,0,0.7)',
+                                color: 'white',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                            }}
+                        >
+                            🏪 競合 {competitors?.length || 0}
+                        </button>
+                        <button
+                            onClick={() => setShowFacilities(!showFacilities)}
+                            style={{
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: showFacilities ? '#d97706' : 'rgba(0,0,0,0.7)',
+                                color: 'white',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                            }}
+                        >
+                            🏢 施設 {facilities?.length || 0}
+                        </button>
+                    </div>
+                    {/* 距離凡例 */}
+                    <div style={{
+                        position: 'absolute',
+                        bottom: '8px',
+                        left: '8px',
+                        zIndex: 9999,
+                        background: 'rgba(0,0,0,0.7)',
+                        borderRadius: '4px',
+                        padding: '4px 8px',
+                        fontSize: '11px',
+                        color: 'white'
+                    }}>
+                        <span style={{ color: '#60a5fa' }}>● 3km</span>
+                        <span style={{ color: '#34d399', marginLeft: '8px' }}>● 5km</span>
+                    </div>
+                    <div ref={mapRef} className="w-full h-full rounded-lg" />
+                </div>
+            );
+        };
+
+        // スパークライン（小さい折れ線）
+        const Sparkline = ({ data, width = 80, height = 30, color = '#10b981' }) => {
+            if (!data || data.length < 2) return null;
+            const max = Math.max(...data);
+            const min = Math.min(...data);
+            const range = max - min || 1;
+            const points = data.map((v, i) => {
+                const x = (i / (data.length - 1)) * width;
+                const y = height - ((v - min) / range) * height;
+                return `${x},${y}`;
+            }).join(' ');
+            return (
+                <svg width={width} height={height} className="inline-block">
+                    <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            );
+        };
+
+        // シンプルな折れ線グラフ（直近12ヶ月、ポップアップツールチップ付き）
+        const DetailedLineChart = ({ data, storeInfo }) => {
+            const containerRef = useRef(null);
+            const [dimensions, setDimensions] = useState({ width: 400, height: 120 });
+            const [tooltip, setTooltip] = useState(null);
+
+            useEffect(() => {
+                if (containerRef.current) {
+                    const resizeObserver = new ResizeObserver(entries => {
+                        for (let entry of entries) {
+                            setDimensions({
+                                width: entry.contentRect.width,
+                                height: 120
+                            });
+                        }
+                    });
+                    resizeObserver.observe(containerRef.current);
+                    return () => resizeObserver.disconnect();
+                }
+            }, []);
+
+            if (!data || data.length === 0) return <div ref={containerRef} style={{ height: 120 }} />;
+
+            const { width, height } = dimensions;
+            const chartData = data.slice(-12);
+            const values = chartData.map(d => d.sales);
+            const max = Math.max(...values);
+            const min = Math.min(...values);
+            const range = max - min || 1;
+            const padding = { top: 15, right: 20, bottom: 25, left: 50 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+
+            const points = chartData.map((d, i) => ({
+                x: padding.left + (i / Math.max(chartData.length - 1, 1)) * chartWidth,
+                y: padding.top + chartHeight - ((d.sales - min) / range) * chartHeight,
+                ...d
+            }));
+
+            const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+            const areaD = pathD + ` L ${points[points.length-1].x} ${padding.top + chartHeight} L ${padding.left} ${padding.top + chartHeight} Z`;
+
+            const yTicks = [0, 0.5, 1].map(t => ({
+                y: padding.top + chartHeight * (1 - t),
+                value: Math.round(min + range * t)
+            }));
+
+            const handleMouseEnter = (p, e) => {
+                setTooltip({ x: e.clientX, y: e.clientY, data: p });
+            };
+            const handleMouseLeave = () => {
+                setTooltip(null);
+            };
+
+            // ツールチップをdocument.bodyにPortalでレンダリング
+            const tooltipElement = tooltip && createPortal(
+                <div style={{
+                    position: 'fixed',
+                    left: tooltip.x + 15,
+                    top: tooltip.y - 10,
+                    transform: 'translateY(-100%)',
+                    background: 'rgba(15, 23, 42, 0.98)',
+                    border: '1px solid rgba(59, 130, 246, 0.5)',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    fontSize: '12px',
+                    color: 'white',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+                    zIndex: 999999,
+                    minWidth: '180px',
+                    pointerEvents: 'none'
+                }}>
+                    <div style={{ fontWeight: 600, marginBottom: '8px', color: '#3b82f6', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '6px' }}>
+                        📍 {storeInfo?.prefecture} {storeInfo?.city}
+                    </div>
+                    <div style={{ marginBottom: '4px', fontWeight: 500 }}>🏪 {storeInfo?.store_name}</div>
+                    <div style={{ marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>📅 売上月</span>
+                            <span style={{ fontWeight: 500 }}>{tooltip.data.month}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>💰 売上金額</span>
+                            <span style={{ fontWeight: 600, color: '#3b82f6' }}>{(tooltip.data.sales / 10000).toLocaleString()}万円</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>📈 前年比</span>
+                            <span style={{ fontWeight: 500, color: (tooltip.data.yoy_change || 0) >= 0 ? '#10b981' : '#ef4444' }}>
+                                {((tooltip.data.yoy_change || 0) * 100).toFixed(1)}%
+                            </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>👥 来店客数</span>
+                            <span style={{ fontWeight: 500 }}>{(tooltip.data.customers || 0).toLocaleString()}人</span>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            );
+
+            return (
+                <div ref={containerRef} style={{ width: '100%', height, position: 'relative' }}>
+                    <svg width={width} height={height}>
+                        <defs>
+                            <linearGradient id="areaGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
+                                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                            </linearGradient>
+                        </defs>
+
+                        {yTicks.map((tick, i) => (
+                            <g key={i}>
+                                <line x1={padding.left} y1={tick.y} x2={width - padding.right} y2={tick.y} stroke="rgba(255,255,255,0.06)" />
+                                <text x={padding.left - 8} y={tick.y + 4} textAnchor="end" fill="rgba(255,255,255,0.4)" fontSize="10">
+                                    {(tick.value / 10000).toFixed(0)}万
+                                </text>
+                            </g>
+                        ))}
+
+                        <path d={areaD} fill="url(#areaGradient2)" />
+                        <path d={pathD} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+                        {points.map((p, i) => {
+                            const yoy = p.yoy_change || 0;
+                            const pointColor = yoy >= 0 ? '#10b981' : '#ef4444';
+                            return (
+                                <g key={i}>
+                                    <circle
+                                        cx={p.x} cy={p.y} r="5" fill={pointColor} stroke="white" strokeWidth="2"
+                                        style={{ cursor: 'pointer', transition: 'r 0.15s' }}
+                                        onMouseEnter={(e) => handleMouseEnter(p, e)}
+                                        onMouseLeave={handleMouseLeave}
+                                    />
+                                    {(i % 2 === 0 || i === points.length - 1) && (
+                                        <text x={p.x} y={height - 6} textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="9">
+                                            {p.month?.slice(5, 7)}月
+                                        </text>
+                                    )}
+                                </g>
+                            );
+                        })}
+                    </svg>
+                    {tooltipElement}
+                </div>
+            );
+        };
+
+        // 水平バーチャート（ツールチップ付き）
+        const HorizontalBarChart = ({ data, storeInfo, totalSales }) => {
+            const [tooltip, setTooltip] = useState(null);
+            const containerRef = useRef(null);
+
+            if (!data || data.length === 0) return null;
+            const max = Math.max(...data.map(d => d.sales_man));
+            const total = totalSales || data.reduce((sum, d) => sum + d.sales_man, 0);
+
+            const handleMouseEnter = (d, e) => {
+                const rect = containerRef.current.getBoundingClientRect();
+                setTooltip({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top,
+                    data: d,
+                    share: ((d.sales_man / total) * 100).toFixed(1),
+                    rank: data.indexOf(d) + 1
+                });
+            };
+
+            return (
+                <div ref={containerRef} className="space-y-2" style={{ position: 'relative' }}>
+                    {data.map((d, i) => (
+                        <div
+                            key={i}
+                            className="flex items-center gap-2 cursor-pointer group"
+                            onMouseEnter={(e) => handleMouseEnter(d, e)}
+                            onMouseLeave={() => setTooltip(null)}
+                        >
+                            <div className="w-20 text-xs text-white/60 truncate group-hover:text-white/90 transition-colors">{d.category}</div>
+                            <div className="flex-1 h-5 bg-white/5 rounded overflow-hidden relative group-hover:bg-white/10 transition-colors">
+                                <div
+                                    className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded transition-all group-hover:from-emerald-400 group-hover:to-emerald-300"
+                                    style={{ width: `${(d.sales_man / max) * 100}%` }}
+                                />
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium">
+                                    {d.sales_man.toLocaleString()}万
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+
+                    {/* ツールチップ */}
+                    {tooltip && (
+                        <div style={{
+                            position: 'absolute',
+                            left: Math.min(tooltip.x + 10, 200),
+                            top: tooltip.y - 80,
+                            background: 'rgba(15, 23, 42, 0.95)',
+                            border: '1px solid rgba(16, 185, 129, 0.5)',
+                            borderRadius: '8px',
+                            padding: '10px 12px',
+                            fontSize: '12px',
+                            color: 'white',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                            zIndex: 1000,
+                            minWidth: '160px',
+                            pointerEvents: 'none'
+                        }}>
+                            <div style={{ fontWeight: 600, marginBottom: '8px', color: '#10b981', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '6px' }}>
+                                🏆 {tooltip.data.category}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>💰 売上金額</span>
+                                <span style={{ fontWeight: 600, color: '#10b981' }}>{tooltip.data.sales_man.toLocaleString()}万円</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>📊 売上構成比</span>
+                                <span style={{ fontWeight: 500 }}>{tooltip.share}%</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>🥇 ランキング</span>
+                                <span style={{ fontWeight: 500 }}>第{tooltip.rank}位 / {data.length}カテゴリ</span>
+                            </div>
+                            {storeInfo && (
+                                <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>
+                                    🏪 {storeInfo.store_name}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const OverviewDashboard = ({ overview, selectedStore }) => {
+            const store = overview?.store;
+            const chain_avg = overview?.chain_avg;
+            const demographics = overview?.demographics;
+            const competitors = overview?.competitors;
+            const facilities = overview?.facilities;
+            const top_categories = overview?.top_categories;
+            const monthly_trend = overview?.monthly_trend;
+
+            const yoyDiff = (store?.avg_yoy_pct || 0) - (chain_avg?.avg_yoy_pct || 0);
+            const salesTrend = monthly_trend?.map(d => d.sales) || [];
+            const customerTrend = monthly_trend?.map(d => d.customers) || [];
+
+            // データがまだない場合
+            if (!store) {
+                return (
+                    <div className="h-full flex items-center justify-center">
+                        <div className="text-center text-white/40">
+                            <div className="spinner w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-3" />
+                            店舗データを読み込み中...
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="h-full overflow-y-auto p-5 space-y-3">
+                    {/* Row 1: コンパクトKPIカード */}
+                    <div className="grid grid-cols-5 gap-2">
+                        <div className="card p-3 rounded-xl">
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-white/50 text-xs">年間売上</span>
+                                <Sparkline data={salesTrend} width={40} height={16} color="#10b981" />
+                            </div>
+                            <div className="text-xl font-bold">{store?.annual_sales_man?.toLocaleString()}<span className="text-xs font-normal text-white/50 ml-1">万円</span></div>
+                        </div>
+                        <div className="card p-3 rounded-xl">
+                            <div className="text-white/50 text-xs mb-1">前年比</div>
+                            <div className={`text-xl font-bold ${store?.avg_yoy_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {store?.avg_yoy_pct >= 0 ? '+' : ''}{store?.avg_yoy_pct?.toFixed(1)}%
+                            </div>
+                        </div>
+                        <div className="card p-3 rounded-xl">
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-white/50 text-xs">月間来店</span>
+                                <Sparkline data={customerTrend} width={40} height={16} color="#3b82f6" />
+                            </div>
+                            <div className="text-xl font-bold">{store?.avg_monthly_customers?.toLocaleString()}<span className="text-xs font-normal text-white/50 ml-1">人</span></div>
+                        </div>
+                        <div className="card p-3 rounded-xl">
+                            <div className="text-white/50 text-xs mb-1">客単価</div>
+                            <div className="text-xl font-bold">{store?.avg_basket?.toLocaleString()}<span className="text-xs font-normal text-white/50 ml-1">円</span></div>
+                        </div>
+                        <div className="card p-3 rounded-xl">
+                            <div className="text-white/50 text-xs mb-1">売場効率</div>
+                            <div className="text-xl font-bold">{store?.size_sqm ? Math.round((store.annual_sales_man * 10000) / store.size_sqm).toLocaleString() : '-'}<span className="text-xs font-normal text-white/50 ml-1">円/㎡</span></div>
+                        </div>
+                    </div>
+
+                    {/* Row 2: メインコンテンツ - 左側データ、右側大きなマップ */}
+                    <div className="grid grid-cols-12 gap-3" style={{ minHeight: '420px' }}>
+                        {/* 左側: チャート + カテゴリ + 商圏 */}
+                        <div className="col-span-7 flex flex-col gap-3">
+                            {/* チャート */}
+                            <div className="card p-4 rounded-xl">
+                                <div className="flex justify-between items-center mb-2">
+                                    <div className="text-white/70 text-sm font-medium">📈 月次売上推移</div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-white/40">直近12ヶ月</span>
+                                        <div className="flex items-center gap-1">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                            <span className="text-xs text-white/40">YoY+</span>
+                                            <span className="w-2 h-2 rounded-full bg-red-500 ml-2"></span>
+                                            <span className="text-xs text-white/40">YoY-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <DetailedLineChart data={monthly_trend} storeInfo={store} />
+                            </div>
+
+                            {/* カテゴリ + 商圏プロファイル - flex-1で残りスペースを埋める */}
+                            <div className="grid grid-cols-2 gap-3 flex-1">
+                                <div className="card p-3 rounded-xl flex flex-col">
+                                    <div className="text-white/70 text-sm font-medium mb-2">🏆 カテゴリ別売上</div>
+                                    <HorizontalBarChart data={top_categories} storeInfo={store} totalSales={store?.annual_sales_man} />
+                                </div>
+                                <div className="card p-3 rounded-xl flex flex-col justify-between">
+                                    <div>
+                                        <div className="text-white/70 text-sm font-medium mb-3">👥 商圏プロファイル</div>
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-white/40">人口</span>
+                                                <span className="font-medium text-emerald-400">{demographics?.population_5km?.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-white/40">世帯</span>
+                                                <span className="font-medium">{demographics?.households?.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-white/40">平均年収</span>
+                                                <span className="font-medium">{Math.floor((demographics?.avg_income || 0) / 10000)}万</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-white/40">高齢化率</span>
+                                                <span className={`font-medium ${demographics?.elderly_rate > 0.25 ? 'text-amber-400' : ''}`}>
+                                                    {((demographics?.elderly_rate || 0) * 100).toFixed(0)}%
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-white/40">若年層率</span>
+                                                <span className="font-medium">{((demographics?.young_adult_rate || 0) * 100).toFixed(0)}%</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-white/40">戸建率</span>
+                                                <span className="font-medium">{((demographics?.detached_house_rate || 0) * 100).toFixed(0)}%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* 店舗スペック - 下部に配置 */}
+                                    <div className="border-t border-white/10 mt-3 pt-3">
+                                        <div className="text-white/50 text-xs mb-2">🏬 店舗スペック</div>
+                                        <div className="grid grid-cols-3 gap-2 text-center">
+                                            <div>
+                                                <div className="text-lg font-bold text-blue-400">{store?.size_sqm?.toLocaleString()}</div>
+                                                <div className="text-xs text-white/40">売場㎡</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-lg font-bold text-purple-400">{store?.parking_capacity}</div>
+                                                <div className="text-xs text-white/40">駐車場台</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-lg font-bold text-amber-400">{store?.store_type || '-'}</div>
+                                                <div className="text-xs text-white/40">タイプ</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 右側: 大きなマップ + 競合/施設リスト */}
+                        <div className="col-span-5 card p-4 rounded-xl flex flex-col">
+                            <div className="flex justify-between items-center mb-2">
+                                <div className="text-white/70 text-sm font-medium">📍 商圏マップ</div>
+                                <div className="text-xs text-white/40">ボタンで表示切替 / マウスオーバーで詳細</div>
+                            </div>
+                            {/* マップ領域 - 大きく */}
+                            <div className="flex-1 rounded-lg overflow-hidden mb-3" style={{ minHeight: '280px' }}>
+                                <StoreMap
+                                    lat={selectedStore?.latitude}
+                                    lng={selectedStore?.longitude}
+                                    storeName={store?.store_name}
+                                    competitors={competitors}
+                                    facilities={facilities}
+                                />
+                            </div>
+                            {/* 競合リスト - マップカード内 */}
+                            <div className="border-t border-white/10 pt-3">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-white/60 text-xs font-medium">🏪 近隣競合店舗</span>
+                                    <span className="text-xs text-white/40">{competitors?.length || 0}店舗</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 max-h-20 overflow-y-auto">
+                                    {competitors?.map((c, i) => (
+                                        <div key={i} className="flex items-center justify-between text-xs p-1.5 bg-white/5 rounded">
+                                            <div className="flex items-center gap-1.5">
+                                                <div className={`w-1.5 h-1.5 rounded-full ${c.is_new_entry ? 'bg-red-400' : 'bg-gray-400'}`} />
+                                                <span className="truncate max-w-[80px]">{c.name}</span>
+                                            </div>
+                                            <span className="text-white/40">{c.distance_km}km</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Row 3: Genieチャット（全幅） */}
+                    <div className="card p-4 rounded-xl border border-emerald-500/30" style={{ minHeight: '280px' }}>
+                        <GenieChat storeContext={{
+                            store_id: store?.store_id,
+                            store_name: store?.store_name,
+                            prefecture: store?.prefecture,
+                            city: store?.city,
+                            yoy_change: store?.avg_yoy_pct ? store.avg_yoy_pct / 100 : 0
+                        }} />
+                    </div>
+                </div>
+            );
+        };
+
+        const ReportViewer = ({ report, lv1, lv2, lv3 }) => {
+            const [activeTab, setActiveTab] = useState('ai');
+            const tabs = [
+                { id: 'ai', label: 'AI総合レポート' },
+                { id: 'lv1', label: 'Lv1 基礎分析' },
+                { id: 'lv2', label: 'Lv2 深掘分析' },
+                { id: 'lv3', label: 'Lv3 施策立案' }
+            ];
+            const renderMarkdown = (text) => ({ __html: marked.parse(text || '') });
+
+            const renderLv1 = () => {
+                if (!lv1) return <div className="text-white/50">データなし</div>;
+                const store = lv1.store_info || {};
+                const demo = lv1.demographics || {};
+                const chain = lv1.chain_average || {};
+                return (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="card p-4 rounded-lg"><div className="text-sm text-white/50 mb-2">年間売上</div><div className="text-2xl font-bold text-emerald-400">{store.annual_sales_man?.toLocaleString()}万円</div></div>
+                            <div className="card p-4 rounded-lg"><div className="text-sm text-white/50 mb-2">前年比</div><div className={`text-2xl font-bold ${store.avg_yoy_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{store.avg_yoy_pct >= 0 ? '+' : ''}{store.avg_yoy_pct?.toFixed(1)}%</div></div>
+                        </div>
+                        <div className="card p-4 rounded-lg">
+                            <div className="text-lg font-semibold mb-3">商圏人口統計</div>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div>5km圏人口: <span className="text-emerald-400">{demo.population_5km?.toLocaleString()}人</span></div>
+                                <div>世帯数: <span className="text-emerald-400">{demo.households?.toLocaleString()}世帯</span></div>
+                                <div>平均年収: <span className="text-emerald-400">{Math.floor(demo.avg_income / 10000)}万円</span></div>
+                                <div>高齢化率: <span className="text-amber-400">{(demo.elderly_rate * 100).toFixed(1)}%</span></div>
+                            </div>
+                        </div>
+                        <div className="card p-4 rounded-lg">
+                            <div className="text-lg font-semibold mb-3">競合状況</div>
+                            <div className="space-y-2">
+                                {(lv1.competitors || []).slice(0, 5).map((c, i) => (
+                                    <div key={i} className="flex justify-between text-sm p-2 bg-white/5 rounded">
+                                        <span>{c.name} {c.is_new_entry && <span className="text-red-400 text-xs">★新規</span>}</span>
+                                        <span className="text-white/50">{c.distance_km}km</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderLv2 = () => {
+                if (!lv2) return <div className="text-white/50">データなし</div>;
+                const cats = lv2.category_analysis || [];
+                const huff = lv2.huff_model || {};
+                return (
+                    <div className="space-y-6">
+                        <div className="card p-4 rounded-lg">
+                            <div className="text-lg font-semibold mb-2">推定市場シェア</div>
+                            <div className="text-3xl font-bold text-emerald-400">{huff.self_share?.toFixed(1)}%</div>
+                        </div>
+                        <div className="card p-4 rounded-lg">
+                            <div className="text-lg font-semibold mb-3">カテゴリ別ギャップ</div>
+                            <div className="space-y-2">
+                                {cats.map((c, i) => (
+                                    <div key={i} className="flex items-center gap-3 text-sm">
+                                        <div className="w-28 truncate">{c.category}</div>
+                                        <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden relative">
+                                            <div className={`absolute h-full ${c.gap >= 0 ? 'bg-emerald-500 left-1/2' : 'bg-red-500 right-1/2'}`} style={{ width: `${Math.min(50, Math.abs(c.gap_pct || 0) / 2)}%` }} />
+                                        </div>
+                                        <div className={`w-16 text-right ${c.gap >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{c.gap >= 0 ? '+' : ''}{c.gap}万</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderLv3 = () => {
+                if (!lv3) return <div className="text-white/50">データなし</div>;
+                const similar = lv3.similar_stores || [];
+                const measures = lv3.measures || [];
+                return (
+                    <div className="space-y-6">
+                        <div className="card p-4 rounded-lg">
+                            <div className="text-lg font-semibold mb-3">類似店舗ベンチマーク</div>
+                            <div className="space-y-2">
+                                {similar.map((s, i) => (
+                                    <div key={i} className="flex justify-between text-sm p-3 bg-white/5 rounded">
+                                        <div><div className="font-medium">{s.store_name}</div><div className="text-xs text-white/50">{s.location}</div></div>
+                                        <div className={`text-lg font-bold ${s.yoy_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{s.yoy_pct >= 0 ? '+' : ''}{s.yoy_pct?.toFixed(1)}%</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="card p-4 rounded-lg">
+                            <div className="text-lg font-semibold mb-3">過去施策</div>
+                            {measures.length > 0 ? measures.map((m, i) => (
+                                <div key={i} className="p-3 bg-white/5 rounded mb-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className={`text-xs px-2 py-0.5 rounded ${m.status === '完了' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>{m.status}</span>
+                                        <span className="font-medium">{m.type}</span>
+                                    </div>
+                                    <div className="text-sm text-white/70">{m.description}</div>
+                                </div>
+                            )) : <div className="text-white/50 text-sm">過去施策データなし</div>}
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="h-full flex flex-col">
+                    <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                        {tabs.map(tab => (
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${activeTab === tab.id ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>{tab.label}</button>
+                        ))}
+                    </div>
+                    <div className="flex-1 overflow-y-auto pr-2">
+                        {activeTab === 'ai' && <div className="markdown-content" dangerouslySetInnerHTML={renderMarkdown(report)} />}
+                        {activeTab === 'lv1' && renderLv1()}
+                        {activeTab === 'lv2' && renderLv2()}
+                        {activeTab === 'lv3' && renderLv3()}
+                    </div>
+                </div>
+            );
+        };
+
+        // 全店舗マップコンポーネント（健康度ヒートマップ）
+        const AllStoresMap = ({ stores, onStoreClick, healthFilter }) => {
+            const mapRef = useRef(null);
+            const mapInstanceRef = useRef(null);
+            const markersRef = useRef([]);
+
+            useEffect(() => {
+                if (!mapRef.current || !stores || stores.length === 0) return;
+
+                // 既存のマップがあれば削除
+                if (mapInstanceRef.current) {
+                    mapInstanceRef.current.remove();
+                    mapInstanceRef.current = null;
+                }
+
+                // 店舗の中心を計算
+                const validStores = stores.filter(s => s.latitude && s.longitude);
+                if (validStores.length === 0) return;
+
+                const avgLat = validStores.reduce((sum, s) => sum + s.latitude, 0) / validStores.length;
+                const avgLng = validStores.reduce((sum, s) => sum + s.longitude, 0) / validStores.length;
+
+                const map = L.map(mapRef.current, {
+                    zoomControl: true,
+                    attributionControl: false
+                }).setView([avgLat, avgLng], 6);
+
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: ''
+                }).addTo(map);
+
+                mapInstanceRef.current = map;
+                setTimeout(() => map.invalidateSize(), 100);
+
+                return () => {
+                    if (mapInstanceRef.current) {
+                        mapInstanceRef.current.remove();
+                        mapInstanceRef.current = null;
+                    }
+                };
+            }, [stores]);
+
+            // マーカーをフィルタに応じて更新
+            useEffect(() => {
+                const map = mapInstanceRef.current;
+                if (!map || !stores) return;
+
+                // 既存のマーカーを削除
+                markersRef.current.forEach(m => map.removeLayer(m));
+                markersRef.current = [];
+
+                const validStores = stores.filter(s => s.latitude && s.longitude);
+
+                validStores.forEach(store => {
+                    const health = calculateHealth(store.yoy_change);
+                    const colors = { emerald: '#10b981', amber: '#f59e0b', red: '#ef4444' };
+                    const color = colors[health.color];
+
+                    // フィルタが設定されている場合、該当しないマーカーは薄く表示
+                    const isFiltered = healthFilter && health.status !== healthFilter;
+                    const opacity = isFiltered ? 0.15 : 1;
+                    const size = isFiltered ? 10 : 16;
+
+                    const icon = L.divIcon({
+                        className: 'custom-marker',
+                        html: `<div style="background:${color}; width:${size}px; height:${size}px; border-radius:50%; border:2px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.3); cursor:pointer; opacity:${opacity};"></div>`,
+                        iconSize: [size, size],
+                        iconAnchor: [size/2, size/2]
+                    });
+
+                    const marker = L.marker([store.latitude, store.longitude], { icon }).addTo(map);
+                    marker.bindPopup(`
+                        <div style="font-family:sans-serif; min-width:140px;">
+                            <b style="color:${color}; font-size:13px;">${store.store_name}</b>
+                            <div style="margin-top:4px; font-size:11px; color:#666;">
+                                <div>${store.prefecture} ${store.city}</div>
+                                <div>前年比: <b style="color:${color}">${(store.yoy_change * 100).toFixed(1)}%</b></div>
+                            </div>
+                        </div>
+                    `);
+                    marker.on('click', () => onStoreClick && onStoreClick(store));
+                    marker.on('mouseover', function() { this.openPopup(); });
+                    markersRef.current.push(marker);
+                });
+            }, [stores, healthFilter, onStoreClick]);
+
+            return <div ref={mapRef} className="w-full h-full rounded-lg" />;
+        };
+
+        // Genie チャットコンポーネント
+        const GenieChat = function(props) {
+            const storeContext = props.storeContext;
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [conversationId, setConversationId] = useState(null);
+            const chartRefs = useRef({});
+
+            // マークダウンをパースする（グローバル関数を使用）
+            var parseMarkdown = function(text) {
+                if (!text) return '';
+                if (typeof window.safeMarkdownParse === 'function') {
+                    return window.safeMarkdownParse(String(text));
+                }
+                return String(text).replace(/\n/g, '<br>');
+            };
+
+            // 店舗が変わったら会話をリセット
+            useEffect(function() {
+                setMessages([]);
+                setConversationId(null);
+                // チャートインスタンスをクリア
+                Object.values(chartRefs.current).forEach(function(chart) {
+                    if (chart) chart.destroy();
+                });
+                chartRefs.current = {};
+            }, [storeContext ? storeContext.store_id : null]);
+
+            // メッセージが更新されたらチャートを描画
+            useEffect(function() {
+                messages.forEach(function(msg, idx) {
+                    if (msg.chartData && !chartRefs.current['chart-' + idx]) {
+                        var canvas = document.getElementById('genie-chart-' + idx);
+                        if (canvas && window.Chart) {
+                            var ctx = canvas.getContext('2d');
+                            chartRefs.current['chart-' + idx] = new window.Chart(ctx, {
+                                type: msg.chartData.type || 'line',
+                                data: msg.chartData.data,
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            display: true,
+                                            labels: { color: 'rgba(255,255,255,0.8)', font: { size: 11 } }
+                                        }
+                                    },
+                                    scales: {
+                                        x: {
+                                            ticks: { color: 'rgba(255,255,255,0.6)', font: { size: 10 } },
+                                            grid: { color: 'rgba(255,255,255,0.1)' }
+                                        },
+                                        y: {
+                                            ticks: { color: 'rgba(255,255,255,0.6)', font: { size: 10 } },
+                                            grid: { color: 'rgba(255,255,255,0.1)' }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+            }, [messages]);
+
+            const sendMessage = function() {
+                if (!input.trim() || loading) return;
+
+                const userMessage = input.trim();
+                setInput('');
+                setMessages(function(prev) { return prev.concat([{ role: 'user', content: userMessage }]); });
+                setLoading(true);
+
+                fetch('/api/genie/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: userMessage,
+                        conversation_id: conversationId,
+                        store_context: storeContext
+                    })
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    console.log('[GenieChat] Response:', data);
+                    if (data.success) {
+                        setConversationId(data.conversation_id);
+                        var responseText = data.text_response || data.description || '';
+
+                        // クエリ結果があれば追加（HTMLテーブル形式）
+                        if (data.data && data.columns && data.data.length > 0) {
+                            // 数値フォーマット関数
+                            var formatValue = function(v) {
+                                if (v == null || v === '') return '';
+                                var str = String(v);
+                                // 科学記法を検出（例: 4.471530158E7）
+                                if (/^-?\d+\.?\d*[eE][+-]?\d+$/.test(str)) {
+                                    var num = parseFloat(str);
+                                    if (!isNaN(num)) {
+                                        // 大きな数値はカンマ区切り
+                                        if (Math.abs(num) >= 1000) {
+                                            return Math.round(num).toLocaleString('ja-JP');
+                                        }
+                                        return num.toFixed(2);
+                                    }
+                                }
+                                // 通常の数値（整数）
+                                if (/^-?\d+$/.test(str) && str.length > 4) {
+                                    return parseInt(str).toLocaleString('ja-JP');
+                                }
+                                // 通常の数値（小数）
+                                if (/^-?\d+\.\d+$/.test(str)) {
+                                    var num = parseFloat(str);
+                                    if (Math.abs(num) >= 1000) {
+                                        return Math.round(num).toLocaleString('ja-JP');
+                                    }
+                                    return num.toFixed(2);
+                                }
+                                return str;
+                            };
+
+                            responseText += '\n\n**クエリ結果:**\n\n';
+                            responseText += '<table><thead><tr>';
+                            data.columns.forEach(function(col) {
+                                responseText += '<th>' + col + '</th>';
+                            });
+                            responseText += '</tr></thead><tbody>';
+                            data.data.slice(0, 10).forEach(function(row) {
+                                responseText += '<tr>';
+                                row.forEach(function(v) {
+                                    responseText += '<td>' + formatValue(v) + '</td>';
+                                });
+                                responseText += '</tr>';
+                            });
+                            responseText += '</tbody></table>';
+                            if (data.data.length > 10) {
+                                responseText += '\n\n_（' + data.data.length + '件中10件を表示）_';
+                            }
+
+                            // チャートデータを生成（時系列or数値データがある場合）
+                            var chartData = null;
+                            var dateColIdx = -1;
+                            var numericColIdxs = [];
+
+                            // 日付カラムと数値カラムを検出
+                            data.columns.forEach(function(col, idx) {
+                                var colLower = col.toLowerCase();
+                                if (colLower.includes('month') || colLower.includes('date') || colLower.includes('year') || colLower === '月') {
+                                    dateColIdx = idx;
+                                }
+                                // 数値カラムを検出（amount, sales, count, 売上など）
+                                if (colLower.includes('amount') || colLower.includes('sales') || colLower.includes('count') ||
+                                    colLower.includes('売上') || colLower.includes('金額')) {
+                                    numericColIdxs.push(idx);
+                                }
+                            });
+
+                            // 日付カラムがなければ最初のカラムをラベルとして使用
+                            if (dateColIdx === -1 && data.columns.length > 1) {
+                                dateColIdx = 0;
+                            }
+                            // 数値カラムがなければ2番目以降の数値っぽいカラムを探す
+                            if (numericColIdxs.length === 0 && data.data.length > 0) {
+                                data.columns.forEach(function(col, idx) {
+                                    if (idx !== dateColIdx) {
+                                        var sampleVal = data.data[0][idx];
+                                        if (sampleVal && /^-?\d+\.?\d*([eE][+-]?\d+)?$/.test(String(sampleVal))) {
+                                            numericColIdxs.push(idx);
+                                        }
+                                    }
+                                });
+                            }
+
+                            // チャートデータを構築（最大2系列まで）
+                            if (dateColIdx >= 0 && numericColIdxs.length > 0) {
+                                var labels = data.data.map(function(row) {
+                                    var val = row[dateColIdx];
+                                    // 日付フォーマット簡略化
+                                    if (val && val.length === 10 && val.includes('-')) {
+                                        return val.substring(0, 7); // YYYY-MM
+                                    }
+                                    return val;
+                                });
+                                var datasets = [];
+                                var colors = ['#10b981', '#3b82f6', '#f59e0b'];
+                                numericColIdxs.slice(0, 2).forEach(function(colIdx, i) {
+                                    datasets.push({
+                                        label: data.columns[colIdx],
+                                        data: data.data.map(function(row) {
+                                            var val = row[colIdx];
+                                            return val ? parseFloat(val) : 0;
+                                        }),
+                                        borderColor: colors[i],
+                                        backgroundColor: colors[i] + '33',
+                                        fill: i === 0,
+                                        tension: 0.3
+                                    });
+                                });
+                                chartData = { type: 'line', data: { labels: labels, datasets: datasets } };
+                            }
+                        }
+
+                        if (!responseText) {
+                            responseText = 'ステータス: ' + data.status;
+                        }
+
+                        var msgObj = { role: 'assistant', content: responseText };
+                        if (chartData) {
+                            msgObj.chartData = chartData;
+                        }
+                        setMessages(function(prev) { return prev.concat([msgObj]); });
+                    } else {
+                        var errorMsg = data.error || 'エラーが発生しました';
+                        setMessages(function(prev) { return prev.concat([{ role: 'assistant', content: '❌ ' + errorMsg, error: true }]); });
+                    }
+                })
+                .catch(function(err) {
+                    console.error('[GenieChat] Error:', err);
+                    setMessages(function(prev) { return prev.concat([{ role: 'assistant', content: '❌ 通信エラー: ' + err.message, error: true }]); });
+                })
+                .finally(function() {
+                    setLoading(false);
+                });
+            };
+
+            var suggestedQuestions = [
+                'この店舗の売上傾向を教えて',
+                '近隣競合店との比較は？',
+                '全店舗数は？'
+            ];
+
+            return (
+                <div className="flex flex-col h-full">
+                    <div className="flex items-center gap-2 mb-3">
+                        <span className="text-lg">🤖</span>
+                        <span className="font-semibold">商圏分析Genieチャット</span>
+                        <span className="text-xs text-white/40 ml-auto">Powered by Genie</span>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-3 mb-3 min-h-0" style={{ minHeight: '180px' }}>
+                        {messages.length === 0 ? (
+                            <div className="text-center py-4">
+                                <div className="text-white/50 text-sm mb-3">質問を入力するか、下のボタンから選んでください</div>
+                                <div className="flex flex-wrap gap-2 justify-center">
+                                    {suggestedQuestions.map(function(q, i) {
+                                        return (
+                                            <button
+                                                key={i}
+                                                onClick={function() { setInput(q); }}
+                                                className="px-3 py-1.5 bg-white/10 hover:bg-emerald-500/20 rounded-full text-xs text-white/70 hover:text-emerald-400 transition-colors"
+                                            >
+                                                {q}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ) : (
+                            messages.map(function(msg, i) {
+                                return (
+                                    <div key={i} className={'flex ' + (msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                                        <div className={'max-w-[85%] px-3 py-2 rounded-lg text-sm ' + (
+                                            msg.role === 'user'
+                                                ? 'bg-emerald-500/20 text-emerald-100'
+                                                : msg.error
+                                                    ? 'bg-red-500/20 text-red-200'
+                                                    : 'bg-white/10 text-white/90'
+                                        )}>
+                                            {msg.role === 'user' ? (
+                                                <div className="whitespace-pre-wrap">{msg.content}</div>
+                                            ) : (
+                                                <div>
+                                                    <div className="genie-response" dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) }} />
+                                                    {msg.chartData && (
+                                                        <div className="mt-3 p-3 bg-black/30 rounded-lg">
+                                                            <div className="text-xs text-white/50 mb-2">📊 データ可視化</div>
+                                                            <div style={{ height: '200px' }}>
+                                                                <canvas id={'genie-chart-' + i}></canvas>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                        {loading && (
+                            <div className="flex justify-start">
+                                <div className="bg-white/10 px-3 py-2 rounded-lg text-sm flex items-center gap-2">
+                                    <div className="spinner w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full" />
+                                    <span className="text-white/50">分析中...</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={function(e) { setInput(e.target.value); }}
+                            onKeyDown={function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                            placeholder="店舗について質問..."
+                            disabled={loading}
+                            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder-white/30 focus:outline-none focus:border-emerald-500/50 disabled:opacity-50"
+                        />
+                        <button
+                            onClick={sendMessage}
+                            disabled={loading || !input.trim()}
+                            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/30 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                            </svg>
+                            送信
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 事業全体ダッシュボードコンポーネント
+        const BusinessOverviewDashboard = ({ data, stores, onStoreClick, onSwitchToStore, chartFilter, onFilterChange }) => {
+            // チャートツールチップ
+            const [chartTooltip, setChartTooltip] = useState(null);
+
+            if (!data) {
+                return (
+                    <div className="flex-1 flex items-center justify-center">
+                        <div className="spinner w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full" />
+                    </div>
+                );
+            }
+
+            const kpi = data.kpi || {};
+            const healthDist = data.health_distribution || {};
+            const trend = data.monthly_trend || [];
+            const topStores = data.top_stores || [];
+            const worstStores = data.worst_stores || [];
+            const regions = data.regional_breakdown || [];
+
+            // フィルターラベル取得
+            const getFilterLabel = () => {
+                if (!chartFilter || !chartFilter.value) return null;
+                if (chartFilter.type === 'health') {
+                    const labels = { healthy: '良好店舗', caution: '要注意店舗', critical: '要治療店舗' };
+                    return labels[chartFilter.value];
+                }
+                if (chartFilter.type === 'prefecture') return chartFilter.value;
+                if (chartFilter.type === 'store') {
+                    const store = stores.find(s => s.store_id === chartFilter.value);
+                    return store?.store_name || chartFilter.value;
+                }
+                return null;
+            };
+
+            // フィルタートグル
+            const toggleFilter = (type, value) => {
+                if (chartFilter?.type === type && chartFilter?.value === value) {
+                    onFilterChange({ type: null, value: null });
+                } else {
+                    onFilterChange({ type, value });
+                }
+            };
+
+            return (
+                <div className="h-full overflow-y-auto p-5 space-y-4">
+                    {/* KPIカード行 */}
+                    <div className="grid grid-cols-5 gap-3">
+                        <div className="card p-4 rounded-xl">
+                            <div className="text-white/50 text-xs mb-1">全店売上</div>
+                            <div className="text-2xl font-bold text-emerald-400">{kpi.total_sales_oku?.toFixed(1)}<span className="text-sm font-normal text-white/50 ml-1">億円</span></div>
+                        </div>
+                        <div className="card p-4 rounded-xl">
+                            <div className="text-white/50 text-xs mb-1">平均前年比</div>
+                            <div className={`text-2xl font-bold ${kpi.avg_yoy_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {kpi.avg_yoy_pct >= 0 ? '+' : ''}{kpi.avg_yoy_pct?.toFixed(1)}%
+                            </div>
+                        </div>
+                        <div
+                            className={`card p-4 rounded-xl border-l-4 border-emerald-500 cursor-pointer transition-all hover:bg-emerald-500/10 ${chartFilter?.type === 'health' && chartFilter?.value === 'healthy' ? 'ring-2 ring-emerald-500 bg-emerald-500/20' : ''}`}
+                            onClick={() => toggleFilter('health', 'healthy')}
+                        >
+                            <div className="text-white/50 text-xs mb-1">✅ 良好</div>
+                            <div className="text-2xl font-bold text-emerald-400">{healthDist.healthy || 0}<span className="text-sm font-normal text-white/50 ml-1">店舗</span></div>
+                        </div>
+                        <div
+                            className={`card p-4 rounded-xl border-l-4 border-amber-500 cursor-pointer transition-all hover:bg-amber-500/10 ${chartFilter?.type === 'health' && chartFilter?.value === 'caution' ? 'ring-2 ring-amber-500 bg-amber-500/20' : ''}`}
+                            onClick={() => toggleFilter('health', 'caution')}
+                        >
+                            <div className="text-white/50 text-xs mb-1">⚠️ 要注意</div>
+                            <div className="text-2xl font-bold text-amber-400">{healthDist.caution || 0}<span className="text-sm font-normal text-white/50 ml-1">店舗</span></div>
+                        </div>
+                        <div
+                            className={`card p-4 rounded-xl border-l-4 border-red-500 cursor-pointer transition-all hover:bg-red-500/10 ${chartFilter?.type === 'health' && chartFilter?.value === 'critical' ? 'ring-2 ring-red-500 bg-red-500/20' : ''}`}
+                            onClick={() => toggleFilter('health', 'critical')}
+                        >
+                            <div className="text-white/50 text-xs mb-1">🚨 要治療</div>
+                            <div className="text-2xl font-bold text-red-400">{healthDist.critical || 0}<span className="text-sm font-normal text-white/50 ml-1">店舗</span></div>
+                        </div>
+                    </div>
+
+                    {/* メインコンテンツ */}
+                    <div className="grid grid-cols-12 gap-4" style={{ minHeight: '360px' }}>
+                        {/* 左側: 月次推移 + ランキング */}
+                        <div className="col-span-7 flex flex-col gap-4">
+                            {/* 月次売上推移 */}
+                            <div className="card p-4 rounded-xl flex-1">
+                                <div className="text-white/70 text-sm font-medium mb-3 flex items-center gap-2">
+                                    📈 月次売上推移
+                                    {getFilterLabel() ? (
+                                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full text-xs flex items-center gap-1">
+                                            {getFilterLabel()}
+                                            <button
+                                                onClick={() => onFilterChange({ type: null, value: null })}
+                                                className="hover:text-white ml-1"
+                                            >×</button>
+                                        </span>
+                                    ) : (
+                                        <span className="text-white/40">（全店合計）</span>
+                                    )}
+                                </div>
+                                <div className="h-44">
+                                    {trend.length > 0 && (
+                                        <svg width="100%" height="100%" viewBox="0 0 700 150" preserveAspectRatio="xMidYMid meet">
+                                            <defs>
+                                                <linearGradient id="businessGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
+                                                    <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                                                </linearGradient>
+                                            </defs>
+                                            {(() => {
+                                                const values = trend.map(d => d.sales_oku);
+                                                const max = Math.max(...values) * 1.1;
+                                                const min = Math.min(...values) * 0.9;
+                                                const range = max - min || 1;
+                                                const points = trend.map((d, i) => ({
+                                                    x: (i / (trend.length - 1)) * 640 + 30,
+                                                    y: 115 - ((d.sales_oku - min) / range) * 95,
+                                                    ...d
+                                                }));
+                                                const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                                                const areaD = pathD + ` L 670 115 L 30 115 Z`;
+                                                return (
+                                                    <>
+                                                        <path d={areaD} fill="url(#businessGradient)" />
+                                                        <path d={pathD} fill="none" stroke="#10b981" strokeWidth="2" />
+                                                        {points.map((p, i) => (
+                                                            <g key={i}>
+                                                                <circle
+                                                                    cx={p.x}
+                                                                    cy={p.y}
+                                                                    r="6"
+                                                                    fill={p.yoy_pct >= 0 ? '#10b981' : '#ef4444'}
+                                                                    stroke="white"
+                                                                    strokeWidth="1.5"
+                                                                    style={{ cursor: 'pointer' }}
+                                                                    onMouseEnter={(e) => setChartTooltip({ x: e.clientX, y: e.clientY, data: p })}
+                                                                    onMouseLeave={() => setChartTooltip(null)}
+                                                                />
+                                                                <text x={p.x} y="135" textAnchor="middle" fill="rgba(255,255,255,0.5)" fontSize="10">{p.month?.slice(5,7)}月</text>
+                                                            </g>
+                                                        ))}
+                                                    </>
+                                                );
+                                            })()}
+                                        </svg>
+                                    )}
+                                    {chartTooltip && createPortal(
+                                        <div style={{
+                                            position: 'fixed',
+                                            left: chartTooltip.x + 15,
+                                            top: chartTooltip.y - 10,
+                                            transform: 'translateY(-100%)',
+                                            background: 'rgba(15, 23, 42, 0.98)',
+                                            border: '1px solid rgba(16, 185, 129, 0.5)',
+                                            borderRadius: '8px',
+                                            padding: '10px 12px',
+                                            fontSize: '12px',
+                                            color: 'white',
+                                            boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+                                            zIndex: 999999,
+                                            minWidth: '160px',
+                                            pointerEvents: 'none'
+                                        }}>
+                                            <div style={{ fontWeight: 600, marginBottom: '8px', color: '#10b981', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '6px' }}>
+                                                📅 {chartTooltip.data.month}
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>💰 全店売上</span>
+                                                <span style={{ fontWeight: 600, color: '#10b981' }}>{chartTooltip.data.sales_oku?.toFixed(1)}億円</span>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>📈 前年比</span>
+                                                <span style={{ fontWeight: 500, color: chartTooltip.data.yoy_pct >= 0 ? '#10b981' : '#ef4444' }}>
+                                                    {chartTooltip.data.yoy_pct >= 0 ? '+' : ''}{chartTooltip.data.yoy_pct?.toFixed(1)}%
+                                                </span>
+                                            </div>
+                                        </div>,
+                                        document.body
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* ランキング */}
+                            <div className="grid grid-cols-2 gap-4" style={{ maxHeight: '200px' }}>
+                                {/* 売上成長ランキング */}
+                                <div className="card p-3 rounded-xl flex flex-col" style={{ maxHeight: '200px' }}>
+                                    <div className="text-white/70 text-sm font-medium mb-2 flex justify-between">
+                                        <span>🏆 売上成長ランキング</span>
+                                        <span className="text-white/40 text-xs">{topStores.length}店舗</span>
+                                    </div>
+                                    <div className="space-y-1 overflow-y-auto flex-1">
+                                        {topStores.map((s, i) => (
+                                            <div
+                                                key={s.store_id}
+                                                className={`flex items-center justify-between text-xs p-1.5 bg-white/5 rounded cursor-pointer hover:bg-emerald-500/20 transition-colors ${chartFilter?.type === 'store' && chartFilter?.value === s.store_id ? 'ring-1 ring-emerald-500 bg-emerald-500/30' : ''}`}
+                                                onClick={() => toggleFilter('store', s.store_id)}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-5 text-center text-white/40">{i + 1}</span>
+                                                    <span className="truncate max-w-[100px]">{s.store_name}</span>
+                                                </div>
+                                                <span className="text-emerald-400 font-medium">+{s.yoy_pct?.toFixed(1)}%</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* 要改善ランキング */}
+                                <div className="card p-3 rounded-xl flex flex-col" style={{ maxHeight: '200px' }}>
+                                    <div className="text-white/70 text-sm font-medium mb-2 flex justify-between">
+                                        <span>⚠️ 要改善ランキング</span>
+                                        <span className="text-white/40 text-xs">{worstStores.length}店舗</span>
+                                    </div>
+                                    <div className="space-y-1 overflow-y-auto flex-1">
+                                        {worstStores.map((s, i) => (
+                                            <div
+                                                key={s.store_id}
+                                                className={`flex items-center justify-between text-xs p-1.5 bg-white/5 rounded cursor-pointer hover:bg-red-500/20 transition-colors ${chartFilter?.type === 'store' && chartFilter?.value === s.store_id ? 'ring-1 ring-red-500 bg-red-500/30' : ''}`}
+                                                onClick={() => toggleFilter('store', s.store_id)}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-5 text-center text-white/40">{i + 1}</span>
+                                                    <span className="truncate max-w-[100px]">{s.store_name}</span>
+                                                </div>
+                                                <span className="text-red-400 font-medium">{s.yoy_pct?.toFixed(1)}%</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 右側: 全店舗マップ */}
+                        <div className="col-span-5 card p-4 rounded-xl flex flex-col">
+                            <div className="flex justify-between items-center mb-2">
+                                <div className="text-white/70 text-sm font-medium">
+                                    🗺️ 全店舗ヒートマップ
+                                    {chartFilter?.type === 'health' && chartFilter?.value && (
+                                        <span className="ml-2 text-xs text-white/40">
+                                            （{chartFilter.value === 'healthy' ? '良好' : chartFilter.value === 'caution' ? '要注意' : '要治療'}のみ表示中）
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs">
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span>良好</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500"></span>注意</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span>要治療</span>
+                                </div>
+                            </div>
+                            <div className="flex-1 rounded-lg overflow-hidden" style={{ minHeight: '280px' }}>
+                                <AllStoresMap
+                                    stores={stores}
+                                    healthFilter={chartFilter?.type === 'health' ? chartFilter.value : null}
+                                    onStoreClick={(store) => {
+                                        toggleFilter('store', store.store_id);
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 地域別集計 */}
+                    <div className="card p-4 rounded-xl">
+                        <div className="text-white/70 text-sm font-medium mb-3">📊 地域別パフォーマンス</div>
+                        <div className="grid grid-cols-6 gap-2">
+                            {regions.slice(0, 12).map((r, i) => (
+                                <div
+                                    key={i}
+                                    className={`p-2 bg-white/5 rounded text-center cursor-pointer transition-all hover:bg-white/10 ${chartFilter?.type === 'prefecture' && chartFilter?.value === r.prefecture ? 'ring-2 ring-blue-500 bg-blue-500/20' : ''}`}
+                                    onClick={() => toggleFilter('prefecture', r.prefecture)}
+                                >
+                                    <div className="text-xs text-white/50 truncate">{r.prefecture}</div>
+                                    <div className={`text-sm font-bold ${r.avg_yoy_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        {r.avg_yoy_pct >= 0 ? '+' : ''}{r.avg_yoy_pct?.toFixed(1)}%
+                                    </div>
+                                    <div className="text-xs text-white/40">{r.store_count}店舗</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [stores, setStores] = useState([]);
+            const [selectedStore, setSelectedStore] = useState(null);
+            const [overview, setOverview] = useState(null);
+            const [analysisStatus, setAnalysisStatus] = useState(null);
+            const [analysisResult, setAnalysisResult] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const pollingRef = useRef(null);
+
+            // ビューモード: 'business' = 事業全体, 'store' = 店舗別
+            const [viewMode, setViewMode] = useState('business');
+            const [businessOverview, setBusinessOverview] = useState(null);
+
+            // 月次売上推移チャートのフィルター状態
+            const [chartFilter, setChartFilter] = useState({ type: null, value: null });
+            // type: 'health' | 'prefecture' | 'store', value: フィルター値
+
+            // フィルタ状態
+            const [statusFilter, setStatusFilter] = useState([]); // ['critical', 'caution', 'healthy']
+            const [searchQuery, setSearchQuery] = useState('');
+            const [prefectureFilter, setPrefectureFilter] = useState(''); // 県フィルタ
+            const [cityFilter, setCityFilter] = useState(''); // 市フィルタ
+
+            // 県・市のユニークリスト（動的生成）
+            const prefectures = [...new Set(stores.map(s => s.prefecture).filter(Boolean))].sort();
+            const cities = [...new Set(
+                stores
+                    .filter(s => !prefectureFilter || s.prefecture === prefectureFilter)
+                    .map(s => s.city)
+                    .filter(Boolean)
+            )].sort();
+
+            // フィルタされた店舗リスト
+            const filteredStores = stores.filter(store => {
+                const health = calculateHealth(store.yoy_change);
+                // ステータスフィルタ
+                if (statusFilter.length > 0 && !statusFilter.includes(health.status)) {
+                    return false;
+                }
+                // 県フィルタ
+                if (prefectureFilter && store.prefecture !== prefectureFilter) {
+                    return false;
+                }
+                // 市フィルタ
+                if (cityFilter && store.city !== cityFilter) {
+                    return false;
+                }
+                // 検索フィルタ
+                if (searchQuery) {
+                    const query = searchQuery.toLowerCase();
+                    const matchName = store.store_name?.toLowerCase().includes(query);
+                    const matchCity = store.city?.toLowerCase().includes(query);
+                    const matchPref = store.prefecture?.toLowerCase().includes(query);
+                    if (!matchName && !matchCity && !matchPref) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            // 県が変更されたら市フィルタをリセット
+            const handlePrefectureChange = (pref) => {
+                setPrefectureFilter(pref);
+                setCityFilter('');
+            };
+
+            // フィルタをすべてクリア
+            const clearAllFilters = () => {
+                setStatusFilter([]);
+                setSearchQuery('');
+                setPrefectureFilter('');
+                setCityFilter('');
+            };
+
+            // アクティブなフィルタ数
+            const activeFilterCount = statusFilter.length + (prefectureFilter ? 1 : 0) + (cityFilter ? 1 : 0) + (searchQuery ? 1 : 0);
+
+            const toggleStatusFilter = (status) => {
+                setStatusFilter(prev =>
+                    prev.includes(status)
+                        ? prev.filter(s => s !== status)
+                        : [...prev, status]
+                );
+            };
+
+            useEffect(() => { fetchStores(); }, []);
+
+            // 事業全体データを取得（フィルター対応）
+            const fetchBusinessOverview = async (healthFilter = null, prefFilter = null, storeFilter = null) => {
+                try {
+                    const params = new URLSearchParams();
+                    if (healthFilter) params.append('health_filter', healthFilter);
+                    if (prefFilter) params.append('prefecture_filter', prefFilter);
+                    if (storeFilter) params.append('store_id_filter', storeFilter);
+                    const url = '/api/business/overview' + (params.toString() ? '?' + params.toString() : '');
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    setBusinessOverview(data);
+                } catch (err) {
+                    console.error('Business overview fetch error:', err);
+                }
+            };
+
+            // 事業全体データの初回ロード
+            useEffect(() => {
+                if (viewMode === 'business' && !businessOverview) {
+                    fetchBusinessOverview();
+                }
+            }, [viewMode]);
+
+            // フィルター変更時にデータ再取得
+            useEffect(() => {
+                if (viewMode !== 'business') return;
+                if (chartFilter.type === null) return; // 初期状態はスキップ
+
+                const { type, value } = chartFilter;
+                if (value === null) {
+                    // フィルタークリア時は全データ取得
+                    fetchBusinessOverview();
+                } else if (type === 'health') {
+                    fetchBusinessOverview(value, null, null);
+                } else if (type === 'prefecture') {
+                    fetchBusinessOverview(null, value, null);
+                } else if (type === 'store') {
+                    fetchBusinessOverview(null, null, value);
+                }
+            }, [chartFilter]);
+
+            useEffect(() => {
+                if (selectedStore) {
+                    setOverview(null);
+                    setAnalysisResult(null);
+                    fetchOverview(selectedStore.store_id);
+                    checkAnalysisStatus(selectedStore.store_id);
+                }
+            }, [selectedStore]);
+
+            useEffect(() => { return () => { if (pollingRef.current) clearInterval(pollingRef.current); }; }, []);
+
+            const fetchStores = async () => {
+                try {
+                    const res = await fetch('/api/stores');
+                    const data = await res.json();
+                    setStores(data.stores || []);
+                } catch (err) { console.error(err); }
+                finally { setLoading(false); }
+            };
+
+            const fetchOverview = async (storeId) => {
+                console.log('[DEBUG] Fetching overview for store:', storeId);
+                try {
+                    const res = await fetch(`/api/stores/${storeId}/overview`);
+                    if (!res.ok) {
+                        console.error('[DEBUG] Overview API error:', res.status);
+                        setOverview({ error: true });
+                        return;
+                    }
+                    const data = await res.json();
+                    console.log('[DEBUG] Overview response:', data, 'keys:', Object.keys(data));
+                    // データが空でもsetOverviewする（空オブジェクトでもローディングを解除）
+                    setOverview(data && Object.keys(data).length > 0 ? data : { empty: true });
+                } catch (err) {
+                    console.error('[DEBUG] Overview fetch error:', err);
+                    setOverview({ error: true });
+                }
+            };
+
+            const checkAnalysisStatus = async (storeId) => {
+                try {
+                    const res = await fetch(`/api/analysis/${storeId}/status`);
+                    const data = await res.json();
+                    setAnalysisStatus(data);
+                    if (data.status === 'completed') fetchAnalysisResult(storeId);
+                    else if (data.status === 'running') startPolling(storeId);
+                } catch (err) { console.error(err); }
+            };
+
+            const fetchAnalysisResult = async (storeId) => {
+                try {
+                    const res = await fetch(`/api/analysis/${storeId}/result`);
+                    const data = await res.json();
+                    setAnalysisResult(data);
+                } catch (err) { console.error(err); }
+            };
+
+            const startAnalysis = async (forceRefresh = false) => {
+                if (!selectedStore) return;
+                try {
+                    console.log('[Analysis] Starting analysis for:', selectedStore.store_id);
+                    setAnalysisStatus({ status: 'running', progress: 0, current_phase: 'lv1' });
+                    const res = await fetch('/api/analysis/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ store_id: selectedStore.store_id, force_refresh: forceRefresh })
+                    });
+                    const data = await res.json();
+                    console.log('[Analysis] API response:', data);
+                    if (data.status === 'running' || data.status === 'completed') {
+                        setAnalysisStatus({ status: data.status, progress: 0, current_phase: data.current_phase || 'lv1' });
+                        if (data.status === 'running') startPolling(selectedStore.store_id);
+                        else fetchAnalysisResult(selectedStore.store_id);
+                    } else {
+                        console.error('[Analysis] Unexpected status:', data);
+                        setAnalysisStatus({ status: 'failed', error: data.message || 'Unknown error' });
+                    }
+                } catch (err) {
+                    console.error('[Analysis] Error:', err);
+                    setAnalysisStatus({ status: 'failed', error: err.message });
+                }
+            };
+
+            const startPolling = (storeId) => {
+                if (pollingRef.current) clearInterval(pollingRef.current);
+                pollingRef.current = setInterval(async () => {
+                    try {
+                        const res = await fetch(`/api/analysis/${storeId}/status`);
+                        const data = await res.json();
+                        setAnalysisStatus(data);
+                        if (data.status === 'completed') {
+                            clearInterval(pollingRef.current);
+                            pollingRef.current = null;
+                            fetchAnalysisResult(storeId);
+                            fetchStores();
+                        } else if (data.status === 'failed') {
+                            clearInterval(pollingRef.current);
+                            pollingRef.current = null;
+                        }
+                    } catch (err) { console.error(err); }
+                }, 2000);
+            };
+
+            const health = selectedStore ? calculateHealth(selectedStore.yoy_change) : null;
+
+            if (loading) return (
+                <div className="min-h-screen flex items-center justify-center">
+                    <div className="spinner w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full" />
+                </div>
+            );
+
+            return (
+                <div className="h-screen flex overflow-hidden">
+                    <div className="w-80 border-r border-white/10 flex flex-col h-full">
+                        <div className="p-4 border-b border-white/10">
+                            <h1 className="text-xl font-bold gradient-text">AI Store Doctor</h1>
+                            <div className="text-sm text-white/50 mt-1">DCM商圏分析システム</div>
+                            {/* ビューモードタブ */}
+                            <div className="flex gap-2 mt-3">
+                                <button
+                                    onClick={() => setViewMode('business')}
+                                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${viewMode === 'business' ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
+                                >
+                                    📊 事業全体
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('store')}
+                                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${viewMode === 'store' ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
+                                >
+                                    🏪 店舗別
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* フィルタセクション */}
+                        <div className="p-3 border-b border-white/10 space-y-3">
+                            {/* 地域フィルタ（県・市） */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <select
+                                    value={prefectureFilter}
+                                    onChange={(e) => handlePrefectureChange(e.target.value)}
+                                    className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white/80 focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                                    style={{ backgroundImage: 'none' }}
+                                >
+                                    <option value="" className="bg-gray-800">🗾 全ての県</option>
+                                    {prefectures.map(pref => (
+                                        <option key={pref} value={pref} className="bg-gray-800">{pref}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={cityFilter}
+                                    onChange={(e) => setCityFilter(e.target.value)}
+                                    className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white/80 focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                                    style={{ backgroundImage: 'none' }}
+                                    disabled={!prefectureFilter && cities.length > 20}
+                                >
+                                    <option value="" className="bg-gray-800">🏙️ 全ての市</option>
+                                    {cities.map(city => (
+                                        <option key={city} value={city} className="bg-gray-800">{city}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* 検索ボックス */}
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="店舗名で検索..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder-white/30 focus:outline-none focus:border-emerald-500/50"
+                                />
+                                {searchQuery && (
+                                    <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* ステータスフィルタ */}
+                            <div className="flex gap-2 flex-wrap">
+                                <button
+                                    onClick={() => toggleStatusFilter('critical')}
+                                    className={`px-2 py-1 rounded-full text-xs transition-all ${statusFilter.includes('critical') ? 'bg-red-500 text-white' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'}`}
+                                >
+                                    🚨 要治療
+                                </button>
+                                <button
+                                    onClick={() => toggleStatusFilter('caution')}
+                                    className={`px-2 py-1 rounded-full text-xs transition-all ${statusFilter.includes('caution') ? 'bg-amber-500 text-white' : 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'}`}
+                                >
+                                    ⚠️ 要注意
+                                </button>
+                                <button
+                                    onClick={() => toggleStatusFilter('healthy')}
+                                    className={`px-2 py-1 rounded-full text-xs transition-all ${statusFilter.includes('healthy') ? 'bg-emerald-500 text-white' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'}`}
+                                >
+                                    ✅ 良好
+                                </button>
+                            </div>
+
+                            {/* フィルタ結果カウント + クリアボタン */}
+                            <div className="flex justify-between items-center">
+                                <div className="text-xs text-white/40">
+                                    <span className="text-emerald-400 font-medium">{filteredStores.length}</span> / {stores.length} 店舗
+                                    {prefectureFilter && <span className="ml-2 text-blue-400">({prefectureFilter})</span>}
+                                </div>
+                                {activeFilterCount > 0 && (
+                                    <button
+                                        onClick={clearAllFilters}
+                                        className="text-xs px-2 py-1 rounded bg-white/10 text-white/50 hover:bg-white/20 hover:text-white/70 transition-all"
+                                    >
+                                        フィルタクリア ({activeFilterCount})
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                            {filteredStores.map(store => (
+                                <StoreCard key={store.store_id} store={store}
+                                    isSelected={viewMode === 'business' ? (chartFilter?.type === 'store' && chartFilter?.value === store.store_id) : (selectedStore?.store_id === store.store_id)}
+                                    onClick={() => {
+                                        if (viewMode === 'business') {
+                                            // 事業全体モードではチャートフィルターに使用
+                                            setChartFilter(prev =>
+                                                prev.type === 'store' && prev.value === store.store_id
+                                                    ? { type: null, value: null }
+                                                    : { type: 'store', value: store.store_id }
+                                            );
+                                        } else {
+                                            setSelectedStore(store);
+                                        }
+                                    }}
+                                    analysisStatus={store.analysis_status} />
+                            ))}
+                            {filteredStores.length === 0 && (
+                                <div className="text-center text-white/30 py-8">
+                                    条件に一致する店舗がありません
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        {viewMode === 'business' ? (
+                            /* 事業全体ダッシュボード */
+                            <BusinessOverviewDashboard
+                                data={businessOverview}
+                                stores={stores}
+                                onStoreClick={(store) => {
+                                    setSelectedStore(store);
+                                }}
+                                onSwitchToStore={() => setViewMode('store')}
+                                chartFilter={chartFilter}
+                                onFilterChange={setChartFilter}
+                            />
+                        ) : selectedStore ? (
+                            <>
+                                <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        {/* 健康度スコア（ツールチップ付き） */}
+                                        <div className="relative group cursor-help">
+                                            <CircularProgress value={health.score} size={70} color={health.color} />
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                <span className="text-xl font-bold">{Math.round(health.score)}</span>
+                                            </div>
+                                            {/* ツールチップ（右側・上揃えで表示） */}
+                                            <div className="absolute left-full top-0 ml-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[9999]">
+                                                <div className="bg-gray-900 border border-white/20 rounded-lg p-3 shadow-xl min-w-[220px]">
+                                                    <div className="text-sm font-semibold text-white mb-2">📊 健康度スコア</div>
+                                                    <div className="space-y-1.5 text-xs">
+                                                        <div className="flex justify-between">
+                                                            <span className="text-white/50">前年比 (YoY)</span>
+                                                            <span className={`font-medium ${selectedStore.yoy_change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                                {selectedStore.yoy_change >= 0 ? '+' : ''}{(selectedStore.yoy_change * 100).toFixed(1)}%
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-white/50">スコア</span>
+                                                            <span className="font-medium text-white">{Math.round(health.score)} / 100</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-white/50">判定</span>
+                                                            <span className={`font-medium ${health.color === 'emerald' ? 'text-emerald-400' : health.color === 'amber' ? 'text-amber-400' : 'text-red-400'}`}>{health.label}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-2 pt-2 border-t border-white/10 text-xs text-white/40">
+                                                        計算式: 50 + (YoY × 200)
+                                                    </div>
+                                                    {/* 矢印（左向き・上寄せ） */}
+                                                    <div className="absolute -left-1.5 top-4 w-3 h-3 bg-gray-900 border-l border-b border-white/20 rotate-45"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-bold">{selectedStore.store_name}</h2>
+                                            <div className="text-sm text-white/50">{selectedStore.prefecture} {selectedStore.city}</div>
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-sm ${health.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-400' : health.color === 'amber' ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>● {health.label}</span>
+                                    </div>
+                                    {analysisStatus?.status === 'completed' && (
+                                        <button onClick={() => startAnalysis(true)} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm flex items-center gap-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1z" clipRule="evenodd" />
+                                            </svg>
+                                            再分析
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="flex-1 overflow-hidden">
+                                    {analysisStatus?.status === 'running' ? (
+                                        <div className="h-full flex items-center justify-center">
+                                            <div className="w-80 card p-6 rounded-xl">
+                                                <div className="text-center mb-4">
+                                                    <div className="font-semibold">包括的分析を実行中...</div>
+                                                    <div className="text-sm text-white/50">他の店舗を閲覧可能です</div>
+                                                </div>
+                                                <PhaseIndicator currentPhase={analysisStatus.current_phase} progress={analysisStatus.progress || 0} />
+                                            </div>
+                                        </div>
+                                    ) : analysisStatus?.status === 'failed' ? (
+                                        <div className="h-full flex items-center justify-center">
+                                            <div className="w-96 card p-6 rounded-xl border border-red-500/30">
+                                                <div className="text-center mb-4">
+                                                    <div className="text-4xl mb-2">⚠️</div>
+                                                    <div className="font-semibold text-red-400">分析中にエラーが発生しました</div>
+                                                    <div className="text-sm text-white/50 mt-2">{analysisStatus.error || '不明なエラー'}</div>
+                                                </div>
+                                                <button onClick={() => startAnalysis(true)} className="w-full px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg font-medium transition-colors">
+                                                    再試行
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : analysisStatus?.status === 'completed' && analysisResult ? (
+                                        <div className="h-full p-6">
+                                            <ReportViewer report={analysisResult.ai_report} lv1={analysisResult.lv1} lv2={analysisResult.lv2} lv3={analysisResult.lv3} />
+                                        </div>
+                                    ) : (
+                                        <OverviewDashboard overview={overview} selectedStore={selectedStore} />
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 flex items-center justify-center">
+                                <div className="text-center">
+                                    <div className="text-6xl mb-4">🏪</div>
+                                    <div className="text-xl font-semibold mb-2">店舗を選択してください</div>
+                                    <div className="text-white/50">左側のリストから分析したい店舗をクリック</div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

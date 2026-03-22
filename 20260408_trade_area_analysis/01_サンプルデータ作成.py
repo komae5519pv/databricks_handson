@@ -14,6 +14,9 @@
 # MAGIC | `competitors` | 競合店舗 | 約200件 |
 # MAGIC | `categories` | カテゴリマスタ | 10カテゴリ |
 # MAGIC | `sales_by_category` | カテゴリ別売上 | 50店舗 × 10カテゴリ × 36ヶ月 |
+# MAGIC | `similar_stores` | 類似店舗マスタ | 50店舗 × 5類似店舗 |
+# MAGIC | `store_measures` | 施策管理 | 約80件 |
+# MAGIC | `nearby_facilities` | 近隣施設 | 50店舗 × 約10施設 |
 
 # COMMAND ----------
 
@@ -677,6 +680,14 @@ spark.sql("""
 # COMMAND ----------
 
 # MAGIC %sql
+# MAGIC -- 主キーカラムをNOT NULLに設定
+# MAGIC ALTER TABLE stores ALTER COLUMN store_id SET NOT NULL;
+# MAGIC ALTER TABLE competitors ALTER COLUMN competitor_id SET NOT NULL;
+# MAGIC ALTER TABLE categories ALTER COLUMN category_id SET NOT NULL;
+
+# COMMAND ----------
+
+# MAGIC %sql
 # MAGIC -- 主キー制約
 # MAGIC ALTER TABLE stores ADD CONSTRAINT pk_stores PRIMARY KEY (store_id);
 # MAGIC ALTER TABLE competitors ADD CONSTRAINT pk_competitors PRIMARY KEY (competitor_id);
@@ -706,6 +717,409 @@ spark.sql("""
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## 14. 類似店舗マスタ（similar_stores）
+# MAGIC
+# MAGIC 各店舗に対して、商圏特性・店舗規模・業績傾向が類似した店舗を定義。
+# MAGIC 施策効果の比較分析に使用。
+
+# COMMAND ----------
+
+# 店舗の特徴量を計算
+df_store_features = spark.sql("""
+    SELECT
+        s.store_id,
+        s.store_type,
+        s.size_sqm,
+        s.prefecture,
+        ta.population_5km,
+        ta.avg_income,
+        ta.elderly_rate,
+        ta.detached_house_rate,
+        AVG(sm.sales_amount) as avg_monthly_sales,
+        AVG(sm.yoy_change) as avg_yoy_change
+    FROM stores s
+    JOIN trade_area ta ON s.store_id = ta.store_id
+    JOIN sales_monthly sm ON s.store_id = sm.store_id
+    WHERE sm.month >= '2024-01-01'
+    GROUP BY s.store_id, s.store_type, s.size_sqm, s.prefecture,
+             ta.population_5km, ta.avg_income, ta.elderly_rate, ta.detached_house_rate
+""")
+
+store_features_pd = df_store_features.toPandas()
+
+# 類似店舗を計算（特徴量の類似度に基づく）
+similar_stores_data = []
+
+for idx, row in store_features_pd.iterrows():
+    store_id = row['store_id']
+
+    # 各店舗との類似度スコアを計算
+    similarities = []
+    for idx2, row2 in store_features_pd.iterrows():
+        if row['store_id'] == row2['store_id']:
+            continue
+
+        # 類似度計算（各特徴量の差分を正規化して合計）
+        size_sim = 1 - abs(row['size_sqm'] - row2['size_sqm']) / 5000
+        pop_sim = 1 - abs(row['population_5km'] - row2['population_5km']) / 300000
+        income_sim = 1 - abs(row['avg_income'] - row2['avg_income']) / 3000000
+        elderly_sim = 1 - abs(row['elderly_rate'] - row2['elderly_rate'])
+        type_sim = 1.0 if row['store_type'] == row2['store_type'] else 0.5
+
+        # 総合類似度スコア（0-100）
+        similarity_score = (size_sim * 0.25 + pop_sim * 0.25 + income_sim * 0.2 +
+                          elderly_sim * 0.15 + type_sim * 0.15) * 100
+
+        similarities.append((row2['store_id'], similarity_score))
+
+    # 上位5店舗を類似店舗として選択
+    similarities.sort(key=lambda x: x[1], reverse=True)
+    for rank, (similar_id, score) in enumerate(similarities[:5], 1):
+        similar_stores_data.append((
+            store_id,
+            similar_id,
+            rank,
+            round(score, 1)
+        ))
+
+similar_stores_schema = StructType([
+    StructField("store_id", StringType(), False),
+    StructField("similar_store_id", StringType(), False),
+    StructField("similarity_rank", IntegerType(), False),
+    StructField("similarity_score", DoubleType(), False),
+])
+
+df_similar_stores = spark.createDataFrame(similar_stores_data, similar_stores_schema)
+df_similar_stores.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable("similar_stores")
+print(f"similar_stores テーブル作成完了: {df_similar_stores.count()} 件")
+
+# COMMAND ----------
+
+display(spark.table("similar_stores").orderBy("store_id", "similarity_rank"))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 15. 施策管理（store_measures）
+# MAGIC
+# MAGIC 各店舗に実施した施策（リニューアル、棚割り変更、価格施策など）を管理。
+# MAGIC 施策前後の効果比較に使用。
+
+# COMMAND ----------
+
+from datetime import datetime, timedelta
+
+# 施策タイプ定義
+measure_types = [
+    ("リニューアル", "大規模改装・店舗リニューアル", 0.15),
+    ("棚割り最適化", "商品配置・棚割りの見直し", 0.08),
+    ("品揃え強化", "特定カテゴリの品揃え拡充", 0.10),
+    ("価格施策", "競合対抗価格・ポイント還元", 0.05),
+    ("販促強化", "チラシ・デジタル広告の強化", 0.06),
+    ("接客改善", "スタッフ教育・接客品質向上", 0.04),
+    ("営業時間延長", "営業時間の延長", 0.03),
+    ("駐車場拡張", "駐車場の拡張・改善", 0.07),
+]
+
+# 施策ステータス
+statuses = ["計画中", "実施中", "完了", "効果測定中"]
+
+# 関連カテゴリ
+categories_list = ["CAT01", "CAT02", "CAT03", "CAT04", "CAT05", "CAT06", "CAT07", "CAT08", "CAT09", "CAT10"]
+
+store_measures_data = []
+measure_id = 1
+
+# 各店舗に0-3件の施策を割り当て
+for _, store_row in df_stores.toPandas().iterrows():
+    store_id = store_row['store_id']
+    num_measures = random.randint(0, 3)
+
+    # 業績が悪い店舗には施策を多めに
+    if random.random() < 0.3:  # 30%の確率で業績悪化店舗として扱う
+        num_measures = random.randint(2, 4)
+
+    used_types = set()
+    for _ in range(num_measures):
+        # 未使用の施策タイプを選択
+        available_types = [t for t in measure_types if t[0] not in used_types]
+        if not available_types:
+            break
+
+        measure_type, description, expected_effect = random.choice(available_types)
+        used_types.add(measure_type)
+
+        # 施策日程
+        start_date = datetime(2024, random.randint(1, 12), random.randint(1, 28))
+        duration_days = random.randint(30, 180)
+        end_date = start_date + timedelta(days=duration_days)
+
+        # ステータス決定
+        today = datetime(2024, 12, 31)
+        if start_date > today:
+            status = "計画中"
+        elif end_date > today:
+            status = "実施中"
+        elif (today - end_date).days < 90:
+            status = "効果測定中"
+        else:
+            status = "完了"
+
+        # 実績効果（完了または効果測定中の場合のみ）
+        if status in ["完了", "効果測定中"]:
+            actual_effect = expected_effect * random.uniform(0.5, 1.5)
+        else:
+            actual_effect = None
+
+        # 関連カテゴリ
+        related_categories = random.sample(categories_list, random.randint(1, 3))
+
+        # 投資額（万円）
+        investment_amount = random.randint(50, 5000) * 10000
+
+        store_measures_data.append((
+            f"M{str(measure_id).zfill(4)}",
+            store_id,
+            measure_type,
+            description,
+            start_date.strftime("%Y-%m-%d"),
+            end_date.strftime("%Y-%m-%d"),
+            status,
+            round(expected_effect, 3),
+            round(actual_effect, 3) if actual_effect else None,
+            ",".join(related_categories),
+            investment_amount
+        ))
+        measure_id += 1
+
+store_measures_schema = StructType([
+    StructField("measure_id", StringType(), False),
+    StructField("store_id", StringType(), False),
+    StructField("measure_type", StringType(), False),
+    StructField("description", StringType(), False),
+    StructField("start_date", StringType(), False),
+    StructField("end_date", StringType(), False),
+    StructField("status", StringType(), False),
+    StructField("expected_effect", DoubleType(), False),
+    StructField("actual_effect", DoubleType(), True),
+    StructField("related_categories", StringType(), False),
+    StructField("investment_amount", IntegerType(), False),
+])
+
+df_measures = spark.createDataFrame(store_measures_data, store_measures_schema)
+df_measures = df_measures.withColumn("start_date", to_date(col("start_date")))
+df_measures = df_measures.withColumn("end_date", to_date(col("end_date")))
+
+df_measures.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable("store_measures")
+print(f"store_measures テーブル作成完了: {df_measures.count()} 件")
+
+# COMMAND ----------
+
+display(spark.table("store_measures").orderBy("store_id", "start_date"))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 16. 近隣施設（nearby_facilities）
+# MAGIC
+# MAGIC 各店舗周辺の集客施設・生活施設を管理。
+# MAGIC 商圏環境分析に使用。
+
+# COMMAND ----------
+
+# 施設タイプ定義
+facility_types = [
+    ("大型商業施設", "ショッピングモール・大型スーパー", 0.8),
+    ("スーパーマーケット", "食品スーパー", 0.6),
+    ("ドラッグストア", "ドラッグストアチェーン", 0.3),
+    ("家電量販店", "家電量販店", 0.5),
+    ("ガソリンスタンド", "ガソリンスタンド", 0.2),
+    ("飲食店街", "飲食店集積エリア", 0.4),
+    ("病院", "総合病院・クリニック", 0.3),
+    ("学校", "小中高校・大学", 0.3),
+    ("公園・レジャー", "公園・レジャー施設", 0.4),
+    ("駅", "鉄道駅", 0.7),
+    ("役所・公共施設", "市役所・図書館等", 0.2),
+    ("工業団地", "工業団地・物流倉庫", 0.3),
+]
+
+facility_names = {
+    "大型商業施設": ["イオンモール", "ららぽーと", "アリオ", "イトーヨーカドー", "ゆめタウン"],
+    "スーパーマーケット": ["マルエツ", "ライフ", "サミット", "ヨークベニマル", "マックスバリュ", "オーケー"],
+    "ドラッグストア": ["マツモトキヨシ", "ウエルシア", "スギ薬局", "ツルハドラッグ", "サンドラッグ"],
+    "家電量販店": ["ヤマダ電機", "ビックカメラ", "ケーズデンキ", "エディオン", "ノジマ"],
+    "ガソリンスタンド": ["ENEOS", "出光", "コスモ石油", "昭和シェル"],
+    "飲食店街": ["駅前商店街", "ロードサイド飲食エリア", "ショッピングセンター内飲食街"],
+    "病院": ["市民病院", "総合病院", "大学病院", "医療センター"],
+    "学校": ["小学校", "中学校", "高校", "大学"],
+    "公園・レジャー": ["市民公園", "運動公園", "レジャー施設", "スポーツクラブ"],
+    "駅": ["JR駅", "私鉄駅", "地下鉄駅"],
+    "役所・公共施設": ["市役所", "区役所", "図書館", "公民館"],
+    "工業団地": ["工業団地", "物流センター", "配送センター"],
+}
+
+nearby_facilities_data = []
+facility_id = 1
+
+for _, store_row in df_stores.toPandas().iterrows():
+    store_id = store_row['store_id']
+    is_urban = store_row['store_type'] == "都市型"
+
+    # 店舗タイプに応じて施設数を調整
+    if is_urban:
+        num_facilities = random.randint(8, 15)
+    else:
+        num_facilities = random.randint(4, 10)
+
+    # ランダムに施設を配置
+    selected_types = random.sample(facility_types, min(num_facilities, len(facility_types)))
+
+    for ftype, fdesc, base_traffic in selected_types:
+        facility_name = random.choice(facility_names[ftype])
+        distance_km = round(random.uniform(0.2, 5.0), 1)
+
+        # 距離に応じて集客への影響を調整
+        if distance_km <= 1.0:
+            traffic_impact = base_traffic * random.uniform(0.9, 1.1)
+        elif distance_km <= 2.0:
+            traffic_impact = base_traffic * random.uniform(0.6, 0.8)
+        else:
+            traffic_impact = base_traffic * random.uniform(0.3, 0.5)
+
+        # 営業時間（施設タイプに応じて）
+        if ftype in ["大型商業施設", "スーパーマーケット", "ドラッグストア", "家電量販店"]:
+            opening_hours = random.choice(["9:00-21:00", "10:00-20:00", "9:00-22:00"])
+        elif ftype == "駅":
+            opening_hours = "5:00-24:00"
+        elif ftype in ["病院", "学校", "役所・公共施設"]:
+            opening_hours = "8:30-17:30"
+        else:
+            opening_hours = None
+
+        nearby_facilities_data.append((
+            f"F{str(facility_id).zfill(5)}",
+            store_id,
+            ftype,
+            facility_name,
+            distance_km,
+            round(traffic_impact, 2),
+            opening_hours
+        ))
+        facility_id += 1
+
+nearby_facilities_schema = StructType([
+    StructField("facility_id", StringType(), False),
+    StructField("store_id", StringType(), False),
+    StructField("facility_type", StringType(), False),
+    StructField("facility_name", StringType(), False),
+    StructField("distance_km", DoubleType(), False),
+    StructField("traffic_impact", DoubleType(), False),
+    StructField("opening_hours", StringType(), True),
+])
+
+df_facilities = spark.createDataFrame(nearby_facilities_data, nearby_facilities_schema)
+df_facilities.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable("nearby_facilities")
+print(f"nearby_facilities テーブル作成完了: {df_facilities.count()} 件")
+
+# COMMAND ----------
+
+display(spark.table("nearby_facilities").orderBy("store_id", "distance_km"))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 17. 追加テーブルのメタデータ
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- テーブルコメント
+# MAGIC COMMENT ON TABLE similar_stores IS '類似店舗マスタ。商圏特性・店舗規模が類似した店舗のペアを定義。施策効果の比較分析に使用';
+# MAGIC COMMENT ON TABLE store_measures IS '施策管理。各店舗に実施した施策（リニューアル、棚割り変更、価格施策など）を管理。施策前後の効果比較に使用';
+# MAGIC COMMENT ON TABLE nearby_facilities IS '近隣施設。各店舗周辺の集客施設・生活施設を管理。商圏環境分析に使用';
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- similar_stores カラムコメント
+# MAGIC ALTER TABLE similar_stores ALTER COLUMN store_id COMMENT '店舗ID（外部キー → stores.store_id）';
+# MAGIC ALTER TABLE similar_stores ALTER COLUMN similar_store_id COMMENT '類似店舗ID（外部キー → stores.store_id）';
+# MAGIC ALTER TABLE similar_stores ALTER COLUMN similarity_rank COMMENT '類似度ランク（1が最も類似）';
+# MAGIC ALTER TABLE similar_stores ALTER COLUMN similarity_score COMMENT '類似度スコア（0-100）';
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- store_measures カラムコメント
+# MAGIC ALTER TABLE store_measures ALTER COLUMN measure_id COMMENT '施策ID（主キー）。形式: M0001, M0002, ...';
+# MAGIC ALTER TABLE store_measures ALTER COLUMN store_id COMMENT '店舗ID（外部キー → stores.store_id）';
+# MAGIC ALTER TABLE store_measures ALTER COLUMN measure_type COMMENT '施策タイプ（リニューアル/棚割り最適化/品揃え強化/価格施策/販促強化/接客改善/営業時間延長/駐車場拡張）';
+# MAGIC ALTER TABLE store_measures ALTER COLUMN description COMMENT '施策の詳細説明';
+# MAGIC ALTER TABLE store_measures ALTER COLUMN start_date COMMENT '施策開始日';
+# MAGIC ALTER TABLE store_measures ALTER COLUMN end_date COMMENT '施策終了日';
+# MAGIC ALTER TABLE store_measures ALTER COLUMN status COMMENT '施策ステータス（計画中/実施中/完了/効果測定中）';
+# MAGIC ALTER TABLE store_measures ALTER COLUMN expected_effect COMMENT '期待効果（前年比改善率）。0.1 = +10%';
+# MAGIC ALTER TABLE store_measures ALTER COLUMN actual_effect COMMENT '実績効果（前年比改善率）。完了・効果測定中の場合のみ';
+# MAGIC ALTER TABLE store_measures ALTER COLUMN related_categories COMMENT '関連カテゴリ（カンマ区切り）';
+# MAGIC ALTER TABLE store_measures ALTER COLUMN investment_amount COMMENT '投資額（円）';
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- nearby_facilities カラムコメント
+# MAGIC ALTER TABLE nearby_facilities ALTER COLUMN facility_id COMMENT '施設ID（主キー）。形式: F00001, F00002, ...';
+# MAGIC ALTER TABLE nearby_facilities ALTER COLUMN store_id COMMENT '店舗ID（外部キー → stores.store_id）';
+# MAGIC ALTER TABLE nearby_facilities ALTER COLUMN facility_type COMMENT '施設タイプ（大型商業施設/スーパーマーケット/ドラッグストア/家電量販店/ガソリンスタンド/飲食店街/病院/学校/公園・レジャー/駅/役所・公共施設/工業団地）';
+# MAGIC ALTER TABLE nearby_facilities ALTER COLUMN facility_name COMMENT '施設名';
+# MAGIC ALTER TABLE nearby_facilities ALTER COLUMN distance_km COMMENT '店舗からの距離（km）';
+# MAGIC ALTER TABLE nearby_facilities ALTER COLUMN traffic_impact COMMENT '集客への影響度（0-1）。1が最も影響大';
+# MAGIC ALTER TABLE nearby_facilities ALTER COLUMN opening_hours COMMENT '営業時間';
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- 主キーカラムをNOT NULLに設定
+# MAGIC ALTER TABLE store_measures ALTER COLUMN measure_id SET NOT NULL;
+# MAGIC ALTER TABLE nearby_facilities ALTER COLUMN facility_id SET NOT NULL;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- 主キー制約
+# MAGIC ALTER TABLE store_measures ADD CONSTRAINT pk_store_measures PRIMARY KEY (measure_id);
+# MAGIC ALTER TABLE nearby_facilities ADD CONSTRAINT pk_nearby_facilities PRIMARY KEY (facility_id);
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- 外部キー制約
+# MAGIC ALTER TABLE similar_stores ADD CONSTRAINT fk_similar_stores_store FOREIGN KEY (store_id) REFERENCES stores(store_id);
+# MAGIC ALTER TABLE similar_stores ADD CONSTRAINT fk_similar_stores_similar FOREIGN KEY (similar_store_id) REFERENCES stores(store_id);
+# MAGIC ALTER TABLE store_measures ADD CONSTRAINT fk_store_measures_store FOREIGN KEY (store_id) REFERENCES stores(store_id);
+# MAGIC ALTER TABLE nearby_facilities ADD CONSTRAINT fk_nearby_facilities_store FOREIGN KEY (store_id) REFERENCES stores(store_id);
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 18. 全テーブル確認
+
+# COMMAND ----------
+
+all_tables = ["stores", "trade_area", "trade_area_expenditure", "competitors", "categories", "sales_monthly", "sales_by_category", "similar_stores", "store_measures", "nearby_facilities"]
+
+print("=" * 60)
+print("作成したテーブル一覧")
+print("=" * 60)
+
+for table in all_tables:
+    count = spark.table(table).count()
+    print(f"{table:30} : {count:,} 件")
+
+print("=" * 60)
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ---
 # MAGIC ## 完了
 # MAGIC
@@ -720,6 +1134,9 @@ spark.sql("""
 # MAGIC | `categories` | 10 | カテゴリマスタ（消費支出マッピング付き） |
 # MAGIC | `sales_monthly` | 1,800 | 月別売上 |
 # MAGIC | `sales_by_category` | 18,000 | カテゴリ別売上 |
+# MAGIC | `similar_stores` | 250 | **類似店舗マスタ**（各店舗5類似店舗） |
+# MAGIC | `store_measures` | 約80 | **施策管理**（リニューアル、棚割り等） |
+# MAGIC | `nearby_facilities` | 約500 | **近隣施設**（商圏環境分析用） |
 # MAGIC
 # MAGIC ### 消費支出データ項目（ゼンリン準拠）
 # MAGIC
@@ -738,10 +1155,10 @@ spark.sql("""
 # MAGIC
 # MAGIC | 種別 | 件数 |
 # MAGIC |------|------|
-# MAGIC | テーブルコメント | 7テーブル |
+# MAGIC | テーブルコメント | 10テーブル |
 # MAGIC | カラムコメント | 全カラム |
-# MAGIC | 主キー制約 | 3テーブル（stores, competitors, categories） |
-# MAGIC | 外部キー制約 | 6制約 |
+# MAGIC | 主キー制約 | 5テーブル（stores, competitors, categories, store_measures, nearby_facilities） |
+# MAGIC | 外部キー制約 | 10制約 |
 # MAGIC
 # MAGIC ### ER図
 # MAGIC
@@ -752,9 +1169,13 @@ spark.sql("""
 # MAGIC   ├── trade_area_expenditure (FK: store_id)
 # MAGIC   ├── competitors (PK: competitor_id, FK: store_id)
 # MAGIC   ├── sales_monthly (FK: store_id)
-# MAGIC   └── sales_by_category (FK: store_id, category_id)
-# MAGIC                              │
-# MAGIC categories (PK: category_id) ─┘
+# MAGIC   ├── sales_by_category (FK: store_id, category_id)
+# MAGIC   │                          │
+# MAGIC   │   categories (PK: category_id) ─┘
+# MAGIC   │
+# MAGIC   ├── similar_stores (FK: store_id, similar_store_id)
+# MAGIC   ├── store_measures (PK: measure_id, FK: store_id)
+# MAGIC   └── nearby_facilities (PK: facility_id, FK: store_id)
 # MAGIC ```
 # MAGIC
 # MAGIC ### 参考資料

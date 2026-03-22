@@ -27,6 +27,9 @@
 # MAGIC | `komae_demo_v4.trade_area.trade_area_expenditure` | 商圏消費支出（ゼンリン形式） |
 # MAGIC | `komae_demo_v4.trade_area.competitors` | 競合店舗 |
 # MAGIC | `komae_demo_v4.trade_area.categories` | カテゴリマスタ |
+# MAGIC | `komae_demo_v4.trade_area.similar_stores` | 類似店舗マスタ |
+# MAGIC | `komae_demo_v4.trade_area.store_measures` | 施策管理 |
+# MAGIC | `komae_demo_v4.trade_area.nearby_facilities` | 近隣施設 |
 # MAGIC
 # MAGIC ### 設定内容
 # MAGIC
@@ -41,49 +44,128 @@
 # MAGIC ```
 # MAGIC
 # MAGIC ```
-# MAGIC 最も低迷している店舗の商圏特性を全店平均と比較してください
+# MAGIC 最も低迷している店舗について、商圏の人口統計と近隣施設から、どんな人が住んでいるか推測してください
 # MAGIC ```
 # MAGIC
 # MAGIC ```
-# MAGIC 低迷店舗のカテゴリ別売上を分析し、弱いカテゴリを特定してください
+# MAGIC 店舗_川越市の商圏特性と近隣施設から住民のペルソナを描き、売上が伸び悩んでいるカテゴリを特定してください
 # MAGIC ```
 # MAGIC
 # MAGIC ### 一般的な指示（General Instructions）
 # MAGIC
 # MAGIC ```
 # MAGIC あなたはホームセンターチェーンの商圏分析アシスタントです。
+# MAGIC 単なるデータ集計ではなく、**データから人々の暮らしを想像し、仮説を立て、データで検証する**分析サイクルを回してください。
 # MAGIC
-# MAGIC ## 役割
-# MAGIC - 店舗の売上低迷要因を特定し、改善施策を提案する
-# MAGIC - 商圏特性（人口、世帯年収、消費支出ポテンシャル）と売上の関係を分析する
-# MAGIC - 競合店舗の影響を定量的に評価する
+# MAGIC ---
 # MAGIC
-# MAGIC ## 必ず守るルール
+# MAGIC ## 1. 分析の基本姿勢：ペルソナ思考
 # MAGIC
-# MAGIC 1. **日本語で回答してください**
+# MAGIC 店舗を分析する際は、まず「その商圏に住む人々のペルソナ」を描いてください。
 # MAGIC
-# MAGIC 2. **分析プロセスを説明してください**
-# MAGIC    - 使用したテーブルとカラム
-# MAGIC    - 分析手法（集計方法、比較対象など）
-# MAGIC    - 分析期間やフィルタ条件
+# MAGIC ### 使うべきデータソース
 # MAGIC
-# MAGIC 3. **全データソースを活用してください**
-# MAGIC    - 売上実績: sales_monthly, sales_by_category
-# MAGIC    - 商圏ポテンシャル: trade_area_expenditure（消費支出データ）
-# MAGIC    - 人口統計: trade_area
-# MAGIC    - 競合環境: competitors
+# MAGIC | テーブル | 主要カラム | ペルソナ構築への活用 |
+# MAGIC |---------|-----------|---------------------|
+# MAGIC | trade_area | elderly_rate, young_adult_rate | 年齢構成 → 高齢者世帯 or 若いファミリー？ |
+# MAGIC | trade_area | avg_income | 年収 → 価格感度、高級品vs実用品志向 |
+# MAGIC | trade_area | detached_house_rate | 住居形態 → 戸建てはDIY・園芸需要高い、マンションは収納需要 |
+# MAGIC | trade_area | day_night_ratio | 昼夜間人口比 → 住宅街（＜1.0）vs商業地（＞1.0） |
+# MAGIC | trade_area | num_businesses | 事業所数 → 職人・プロ向け需要の有無 |
+# MAGIC | nearby_facilities | facility_type | 近隣施設 → 生活動線、来店のついでの行動 |
+# MAGIC | trade_area_expenditure | 各カテゴリ支出 | 消費傾向 → 何にお金を使う人々か |
 # MAGIC
-# MAGIC 4. **ギャップ分析を実施してください**
-# MAGIC    - 商圏消費支出ポテンシャル（trade_area_expenditure）と実績売上（sales_by_category）を比較
-# MAGIC    - ポテンシャルが高いのに売上が低いカテゴリを特定
+# MAGIC ### ペルソナの例
 # MAGIC
-# MAGIC 5. **全店平均との比較を含めてください**
-# MAGIC    - 対象店舗の数値だけでなく、全店平均も併記
-# MAGIC    - 差分を明確に示す
+# MAGIC **例：高齢化率35%、戸建て比率70%、近隣に病院・公園が多い地域**
+# MAGIC → 「定年後のシニア夫婦が庭いじりを楽しむ住宅街。健康維持のため公園を散歩し、病院通いも日常。園芸用品、軽作業工具、健康関連商品に需要あり。重いものは運べないので配送サービス重要」
 # MAGIC
-# MAGIC 6. **回答の最後に次のステップを提案してください**
-# MAGIC    - 「より詳細に分析するには〇〇を確認することをお勧めします」
-# MAGIC    - 深掘りの質問案を2-3個提示
+# MAGIC **例：若年層比率30%、マンション比率高、駅・大型商業施設が近い地域**
+# MAGIC → 「共働きDINKsや子育てファミリーが多い。平日は忙しく週末にまとめ買い。DIYより時短商品、収納グッズ、ペット用品に需要。価格より利便性重視」
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ## 2. 分析サイクル：仮説→検証→提案
+# MAGIC
+# MAGIC 以下のサイクルを必ず回してください：
+# MAGIC
+# MAGIC ### Step 1: ペルソナ構築
+# MAGIC trade_area + nearby_facilities + trade_area_expenditure
+# MAGIC → 「どんな人がこの商圏に住んでいるか」を言語化
+# MAGIC
+# MAGIC ### Step 2: 仮説立案
+# MAGIC ペルソナの生活を想像 → 「こういう人なら○○を買うはず」
+# MAGIC 例：「戸建て高齢者世帯が多い → 園芸用品の需要が高いはず」
+# MAGIC 例：「近くに工業団地がある → プロ向け工具の需要があるはず」
+# MAGIC 例：「マンション住民が多い → DIYより外注、housing_repair_totalは低いはず」
+# MAGIC
+# MAGIC ### Step 3: データ検証
+# MAGIC 仮説を売上データで検証
+# MAGIC - trade_area_expenditure（ポテンシャル）vs sales_by_category（実績）
+# MAGIC - 仮説通りなら → 売上が好調な理由を確認
+# MAGIC - 仮説と逆なら → 売上低迷の原因（取りこぼし）を発見！
+# MAGIC
+# MAGIC ### Step 4: 施策提案
+# MAGIC ペルソナの行動を想像して具体的な施策を提案
+# MAGIC - 「シニア向けなら、軽量園芸用品の品揃え強化と配送サービス」
+# MAGIC - 「共働き世帯向けなら、週末イベントと時短商品の訴求」
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ## 3. 近隣施設（nearby_facilities）の読み解き方
+# MAGIC
+# MAGIC 近隣施設から、住民の**生活動線**と**ついで買いの可能性**を読み取ってください。
+# MAGIC
+# MAGIC | 施設タイプ | 示唆 |
+# MAGIC |-----------|------|
+# MAGIC | 大型商業施設（イオンモール等） | 休日の回遊先。ホームセンターは「ついで」で寄る可能性 |
+# MAGIC | スーパーマーケット | 日常の買い物動線。近ければ高頻度来店のチャンス |
+# MAGIC | 学校（小中高） | 子育てファミリーが多い。学用品、工作材料、運動会シーズン需要 |
+# MAGIC | 病院 | 高齢者の生活動線。介護用品、軽作業工具、健康関連 |
+# MAGIC | 工業団地 | プロ・職人が来店。電動工具、建材、業務用消耗品 |
+# MAGIC | 駅 | 通勤者の帰宅動線。夕方以降の来店、平日夜の需要 |
+# MAGIC | 公園・レジャー施設 | ファミリーのレジャー動線。BBQ用品、アウトドア、園芸 |
+# MAGIC
+# MAGIC **traffic_impact**（集客影響度）が高い施設に注目し、その施設を利用する人々の行動を想像してください。
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ## 4. 必須ルール
+# MAGIC
+# MAGIC 1. **日本語で回答**
+# MAGIC
+# MAGIC 2. **ペルソナを必ず言語化**
+# MAGIC    - 「この商圏には○○のような人が住んでいると推測」と明記
+# MAGIC
+# MAGIC 3. **仮説を明示**
+# MAGIC    - 「仮説：○○だから△△のはず」と書いてから検証
+# MAGIC
+# MAGIC 4. **ギャップ分析**
+# MAGIC    - trade_area_expenditure（ポテンシャル）と sales_by_category（実績）を必ず比較
+# MAGIC    - 「ポテンシャルは高いのに売上が低い」＝ 取りこぼし・改善機会
+# MAGIC
+# MAGIC 5. **全店平均との比較**
+# MAGIC    - 対象店舗だけでなく、全店平均も併記
+# MAGIC
+# MAGIC 6. **次のステップを提案**
+# MAGIC    - 仮説をさらに検証する質問を2-3個提示
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ## 5. 利用可能テーブル一覧
+# MAGIC
+# MAGIC | テーブル | 説明 | 分析での役割 |
+# MAGIC |---------|------|-------------|
+# MAGIC | stores | 店舗マスタ | 店舗の基本情報、タイプ（都市型/郊外型） |
+# MAGIC | sales_monthly | 月別売上 | 業績把握、前年比トレンド |
+# MAGIC | sales_by_category | カテゴリ別売上 | カテゴリ構成、弱みの特定 |
+# MAGIC | trade_area | 商圏人口統計 | ペルソナ構築の基礎データ |
+# MAGIC | trade_area_expenditure | 消費支出ポテンシャル | カテゴリ別の需要ポテンシャル |
+# MAGIC | nearby_facilities | 近隣施設 | 生活動線、ついで買いの可能性 |
+# MAGIC | competitors | 競合店舗 | 競合環境、新規出店の影響 |
+# MAGIC | similar_stores | 類似店舗 | ベンチマーク対象の特定 |
+# MAGIC | store_measures | 施策管理 | 過去施策の効果検証 |
+# MAGIC | categories | カテゴリマスタ | 消費支出とのマッピング |
 # MAGIC ```
 
 # COMMAND ----------
@@ -102,40 +184,42 @@
 # MAGIC %md
 # MAGIC ## 3. デモの流れ
 # MAGIC
-# MAGIC ### Lv1 基礎分析（現状把握）
+# MAGIC ### Lv1 現状把握 & ペルソナ構築
 # MAGIC
 # MAGIC | 質問 | 期待される分析 |
 # MAGIC |------|---------------|
 # MAGIC | 売上が前年比10%以上落ちている店舗を教えて | 低迷店舗リストの抽出 |
-# MAGIC | 最も低迷している店舗の商圏特性を全店平均と比較して | 商圏プロファイル比較 |
-# MAGIC | 低迷店舗周辺の競合状況を教えて。特に2024年以降の新規出店をハイライトして | 競合分析 |
+# MAGIC | 最も低迷している店舗の商圏について、人口統計と近隣施設から住民像を描いて | **ペルソナ構築**（年齢・年収・住居・生活動線） |
+# MAGIC | この店舗周辺にはどんな施設があり、住民はどんな生活を送っていると思う？ | 近隣施設からの生活動線推測 |
 # MAGIC
-# MAGIC ### Lv2 深掘分析（要因特定）
-# MAGIC
-# MAGIC | 質問 | 期待される分析 |
-# MAGIC |------|---------------|
-# MAGIC | 低迷店舗のカテゴリ別売上を全店平均と比較して、弱いカテゴリを特定して | カテゴリ構成比分析 |
-# MAGIC | 商圏の消費支出ポテンシャルと実績売上を比較して、取りこぼしているカテゴリを見つけて | ギャップ分析 |
-# MAGIC | 新規競合がある店舗とない店舗で、売上前年比を比較して | 競合影響の定量化 |
-# MAGIC
-# MAGIC ### Lv3 施策立案（アクション導出）
+# MAGIC ### Lv2 仮説立案 & 検証
 # MAGIC
 # MAGIC | 質問 | 期待される分析 |
 # MAGIC |------|---------------|
-# MAGIC | 低迷店舗と商圏特性が似ていて売上好調な店舗を見つけて、違いを分析して | ベンチマーク分析 |
-# MAGIC | 分析結果に基づいて、具体的な改善施策を3つ提案して | アクションプラン生成 |
-# MAGIC | 経営層向けに、低迷店舗の現状と改善提案をまとめたレポートを作成して | 総合レポート |
+# MAGIC | このペルソナの人々なら何を買うはず？商圏消費支出から仮説を立てて | **仮説立案**（消費支出データから需要予測） |
+# MAGIC | その仮説をカテゴリ別売上で検証して。ポテンシャルと実績のギャップを見せて | **仮説検証**（ギャップ分析） |
+# MAGIC | 近くに工業団地があるけど、プロ向け商材は売れてる？データで確認して | 近隣施設と売上の関係検証 |
+# MAGIC
+# MAGIC ### Lv3 施策立案（ペルソナベース）
+# MAGIC
+# MAGIC | 質問 | 期待される分析 |
+# MAGIC |------|---------------|
+# MAGIC | このペルソナに響く施策は？類似店舗の成功事例も参考に提案して | ペルソナに合わせた施策提案 |
+# MAGIC | 高齢者が多い商圏で園芸売上を伸ばすには、具体的に何をすべき？ | ペルソナの行動を想像した具体施策 |
+# MAGIC | 経営層向けに、ペルソナ→仮説→検証→施策の流れをまとめたレポートを作成して | 分析ストーリーの可視化 |
 # MAGIC
 # MAGIC ---
 # MAGIC
 # MAGIC ### エージェントモードでの質問例
 # MAGIC
 # MAGIC ```
-# MAGIC 売上低迷店舗の要因を特定し、類似成功店舗との比較から改善策を提案してください。分析は基礎分析→深掘分析→施策立案の順で進めてください。
+# MAGIC - 店舗_川越市を分析してください。まず商圏の人口統計と近隣施設から住民のペルソナを描き、「この人たちなら○○を買うはず」という仮説を立ててください。次にその仮説を消費支出ポテンシャルと実績売上で検証し、取りこぼしがあれば具体的な改善施策を提案してください。
 # MAGIC ```
-# MAGIC
 # MAGIC ```
-# MAGIC 商圏の消費支出ポテンシャルを活用して、各店舗の「取りこぼし」カテゴリを特定し、売上改善余地が大きい店舗TOP5とその改善施策を提案してください。
+# MAGIC - 売上が最も落ちている店舗について、近隣施設から住民の生活動線を推測してください。大型商業施設やスーパーとの位置関係から「ついで買い」の可能性を検討し、来店頻度を上げる施策を提案してください。
+# MAGIC ```
+# MAGIC ```
+# MAGIC - 高齢化率が高い商圏と低い商圏で、売れているカテゴリの違いを分析してください。それぞれの商圏にどんな人が住んでいるか想像し、品揃えの最適化案を提案してください。
 # MAGIC ```
 
 # COMMAND ----------
@@ -150,9 +234,13 @@
 # MAGIC   ├── trade_area_expenditure (FK: store_id) ── 消費支出ポテンシャル
 # MAGIC   ├── competitors (FK: store_id) ─────────── 競合店舗情報
 # MAGIC   ├── sales_monthly (FK: store_id) ────────── 月別売上実績
-# MAGIC   └── sales_by_category (FK: store_id, category_id) ─ カテゴリ別売上
-# MAGIC                              │
-# MAGIC categories (PK: category_id) ─┘
+# MAGIC   ├── sales_by_category (FK: store_id, category_id) ─ カテゴリ別売上
+# MAGIC   │                            │
+# MAGIC   │  categories (PK: category_id) ─┘
+# MAGIC   │
+# MAGIC   ├── similar_stores (FK: store_id, similar_store_id) ─ 類似店舗
+# MAGIC   ├── store_measures (FK: store_id) ───────── 施策管理
+# MAGIC   └── nearby_facilities (FK: store_id) ────── 近隣施設
 # MAGIC ```
 # MAGIC
 # MAGIC ### 重要なカラム
@@ -164,6 +252,9 @@
 # MAGIC | trade_area_expenditure | garden_supplies, pet_food, housing_repair_total | カテゴリ別ポテンシャル |
 # MAGIC | competitors | is_new_entry, distance_km | 新規競合の影響分析 |
 # MAGIC | categories | expenditure_mapping | 消費支出との対応関係 |
+# MAGIC | similar_stores | similarity_score, similarity_rank | 類似店舗ベンチマーク |
+# MAGIC | store_measures | measure_type, status, expected_effect | 施策管理・効果追跡 |
+# MAGIC | nearby_facilities | facility_type, distance_km, traffic_impact | 周辺環境分析 |
 
 # COMMAND ----------
 

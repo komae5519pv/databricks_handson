@@ -164,8 +164,13 @@ actions = generate_action_plan(worst_store, benchmarks)
 | `stores` | 店舗マスタ（ID、名前、所在地、緯度経度、面積など） |
 | `sales_monthly` | 月別売上（店舗ID、月、売上、客数、客単価など） |
 | `trade_area` | 商圏情報（店舗ID、人口、世帯数、年収、年齢分布など） |
+| `trade_area_expenditure` | 商圏消費支出（店舗ID、消費支出ポテンシャル） |
 | `competitors` | 競合店舗（店舗ID、競合名、距離、業態、面積など） |
 | `categories` | カテゴリマスタ（カテゴリID、名前、ポテンシャル係数など） |
+| `sales_by_category` | カテゴリ別売上（店舗ID、カテゴリID、月、売上） |
+| `similar_stores` | 類似店舗マスタ（店舗ID、類似店舗ID、類似度ランク・スコア） |
+| `store_measures` | 施策管理（施策ID、店舗ID、施策タイプ、ステータス、効果） |
+| `nearby_facilities` | 近隣施設（施設ID、店舗ID、施設タイプ、距離、集客影響度） |
 
 ## 注意事項
 
