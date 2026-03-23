@@ -1,0 +1,1783 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Optimization</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0f0f13;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 20px;
+            color: #ffffff;
+        }
+
+        .tab-container {
+            display: flex;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 5px;
+            border-radius: 14px;
+            margin-bottom: 28px;
+        }
+
+        .tab {
+            padding: 14px 28px;
+            font-size: 14px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.4);
+            background: transparent;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .tab:hover { color: rgba(255, 255, 255, 0.7); }
+        .tab.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+
+        .header { text-align: center; margin-bottom: 36px; }
+
+        h1 {
+            font-size: 42px;
+            font-weight: 600;
+            letter-spacing: -1px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .step-indicator {
+            display: none;
+        }
+
+        .stage-wrapper {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            padding: 50px 60px;
+        }
+
+        .stage {
+            position: relative;
+            width: 860px;
+            height: 340px;
+        }
+
+        .animation-panel {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+        .animation-panel.active { display: block; }
+
+        /* Common elements */
+        .container-box {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .container-label {
+            position: absolute;
+            top: 12px;
+            left: 14px;
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-block {
+            position: absolute;
+            width: 52px;
+            height: 26px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.95);
+            transition: left 0.5s cubic-bezier(0.16, 1, 0.3, 1), top 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+        }
+        /* Liquid用の縦並びブロック（ファイル内に配置） */
+        .data-block.record {
+            width: calc(100% - 20px);
+            left: 10px;
+            height: 20px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 500;
+        }
+        /* ZORDER用のパネルレベルブロック（ファイル間移動用） */
+        .data-block.panel-level {
+            width: 100px;
+            height: 20px;
+            border-radius: 4px;
+            font-size: 8px;
+            font-weight: 500;
+        }
+
+        .data-block.tokyo {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            box-shadow: 0 3px 15px rgba(139, 92, 246, 0.4);
+        }
+        .data-block.osaka {
+            background: linear-gradient(135deg, #fb923c, #f97316);
+            box-shadow: 0 3px 15px rgba(251, 146, 60, 0.4);
+        }
+        .data-block.hokkaido {
+            background: linear-gradient(135deg, #34d399, #10b981);
+            box-shadow: 0 3px 15px rgba(52, 211, 153, 0.4);
+        }
+        .data-block.faded {
+            opacity: 0.15;
+            box-shadow: none;
+        }
+
+        /* Partition styles */
+        .partition {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        .partition.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .partition.tokyo { border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.06); }
+        .partition.osaka { border-color: rgba(251, 146, 60, 0.4); background: rgba(251, 146, 60, 0.06); }
+        .partition.hokkaido { border-color: rgba(52, 211, 153, 0.4); background: rgba(52, 211, 153, 0.06); }
+        .partition.tokyo .container-label { color: rgba(167, 139, 250, 0.8); }
+        .partition.osaka .container-label { color: rgba(251, 146, 60, 0.8); }
+        .partition.hokkaido .container-label { color: rgba(52, 211, 153, 0.8); }
+        .partition.faded { opacity: 0.15; }
+        .partition.highlighted {
+            border-color: rgba(139, 92, 246, 0.8);
+            box-shadow: 0 0 50px rgba(139, 92, 246, 0.2);
+        }
+
+        /* File styles */
+        .file { overflow: visible; }
+        .file.highlighted {
+            border-color: rgba(139, 92, 246, 0.6);
+            box-shadow: 0 0 40px rgba(139, 92, 246, 0.2);
+        }
+        .file.faded { opacity: 0.2; }
+        .file.new-file {
+            border-color: rgba(251, 191, 36, 0.5);
+            background: rgba(251, 191, 36, 0.05);
+        }
+        .file.optimized {
+            border-color: rgba(52, 211, 153, 0.4);
+            background: rgba(52, 211, 153, 0.05);
+        }
+        .file.processing {
+            animation: pulse 0.6s ease-in-out;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(0.96); border-color: rgba(139, 92, 246, 0.8); }
+        }
+
+        /* File stats styles */
+        .file-stats {
+            position: absolute;
+            bottom: -22px;
+            left: 0;
+            right: 0;
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.85);
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            white-space: nowrap;
+        }
+        .file-stats.visible {
+            opacity: 1;
+        }
+        .file-stats .stat-label {
+            color: rgba(255, 255, 255, 0.5);
+            margin-right: 2px;
+        }
+        .file-stats .stat-value {
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        /* Query display - hidden, integrated into info-box */
+        .query-display { display: none; }
+
+        /* Info box - all information in one place */
+        .info-box {
+            position: absolute;
+            top: 230px;
+            left: 50%;
+            transform: translateX(-50%);
+            min-width: 700px;
+            text-align: center;
+            background: rgba(30, 30, 40, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 16px 28px;
+            z-index: 10;
+            white-space: nowrap;
+        }
+        .info-step {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        .info-step .num {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 2px 8px;
+            margin-right: 8px;
+        }
+        .info-query {
+            display: inline-block;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.95);
+            margin-bottom: 12px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 10px 20px;
+        }
+        .info-query:empty {
+            display: none;
+        }
+        .info-query .keyword { color: #c084fc; }
+        .info-query .value { color: #fbbf24; }
+        .info-query .command { color: #34d399; }
+        .info-message {
+            font-size: 15px;
+            color: #ffffff;
+            font-weight: 500;
+            white-space: normal;
+        }
+        .info-message.success { color: #34d399; }
+        .info-message.warning { color: #fbbf24; }
+
+        /* Controls */
+        .controls {
+            margin-top: 50px;
+            display: flex;
+            gap: 12px;
+        }
+
+        button.ctrl {
+            padding: 14px 28px;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-primary {
+            background: #ffffff;
+            color: #0f0f13;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .progress-bar {
+            display: flex;
+            gap: 8px;
+            margin-top: 28px;
+        }
+
+        .progress-segment {
+            width: 44px;
+            height: 3px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        .progress-segment.active { background: #ffffff; }
+
+        .legend {
+            display: flex;
+            gap: 28px;
+            margin-top: 28px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+        .legend-dot.tokyo { background: #8b5cf6; }
+        .legend-dot.osaka { background: #fb923c; }
+        .legend-dot.hokkaido { background: #34d399; }
+
+        /* Summary page styles */
+        .summary-content {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 13px;
+        }
+        .comparison-table th,
+        .comparison-table td {
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .comparison-table thead th {
+            position: sticky;
+            top: 0;
+            background: #1a1a20;
+            font-size: 14px;
+            font-weight: 600;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            z-index: 1;
+        }
+        .comparison-table thead th:first-child { width: 110px; }
+        .comparison-table thead th.col-part { color: #60a5fa; }
+        .comparison-table thead th.col-zorder { color: #f472b6; }
+        .comparison-table thead th.col-liquid { color: #34d399; }
+        .comparison-table tbody tr { border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+        .comparison-table tbody th {
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .comparison-table tbody td {
+            color: rgba(255, 255, 255, 0.85);
+            line-height: 1.5;
+        }
+        .comparison-table .cmd {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 11px;
+        }
+        .comparison-table .good { color: #34d399; }
+        .comparison-table .warn { color: #fbbf24; }
+    </style>
+</head>
+<body>
+    <div class="tab-container">
+        <button class="tab active" id="tab-partitioning" onclick="switchTab('partitioning')">Partitioning</button>
+        <button class="tab" id="tab-zorder" onclick="switchTab('zorder')">ZORDER</button>
+        <button class="tab" id="tab-liquid" onclick="switchTab('liquid')">Liquid Clustering</button>
+        <button class="tab" id="tab-summary" onclick="switchTab('summary')">まとめ</button>
+    </div>
+
+    <div class="header">
+        <h1 id="mainTitle">Data Partitioning</h1>
+        <p class="subtitle" id="mainSubtitle">パーティションキーでデータを物理分割</p>
+    </div>
+
+    <div class="step-indicator">
+        <div class="step-number" id="stepNum">1</div>
+        <div class="step-text" id="stepLabel">データ混在状態</div>
+    </div>
+
+    <div class="stage-wrapper">
+        <div class="stage" id="stage">
+            <div class="animation-panel active" id="panel-partitioning"></div>
+            <div class="animation-panel" id="panel-zorder"></div>
+            <div class="animation-panel" id="panel-liquid"></div>
+            <div class="animation-panel" id="panel-summary"></div>
+        </div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot tokyo"></div>東京</div>
+        <div class="legend-item"><div class="legend-dot osaka"></div>大阪</div>
+        <div class="legend-item"><div class="legend-dot hokkaido"></div>北海道</div>
+    </div>
+
+    <div class="controls">
+        <button class="ctrl btn-secondary" onclick="reset()">Reset</button>
+        <button class="ctrl btn-primary" onclick="nextStep()">Next Step →</button>
+        <button class="ctrl btn-secondary" onclick="autoPlay()">Auto Play</button>
+    </div>
+
+    <div class="progress-bar" id="progressBar"></div>
+
+    <script>
+        let currentTab = 'partitioning';
+        let currentStep = 0;
+        let data = {};
+        let isAnimating = false;
+
+        const config = {
+            partitioning: {
+                title: 'Data Partitioning',
+                subtitle: 'パーティションキーでデータを物理分割',
+                steps: ['初期状態', 'パーティション作成', 'データ移動', 'パーティション完了', '新規データ到着', 'クエリ実行（効く）', '別クエリ（効かない）', '高カーディナリティ問題']
+            },
+            zorder: {
+                title: 'ZORDER',
+                subtitle: 'ファイル内でデータをソートしてスキップ効率化',
+                steps: ['初期状態', 'クエリの問題', 'ZORDER最適化', '最適化完了', '新規データ到着', '再OPTIMIZE（全ファイル）', '再クエリ']
+            },
+            liquid: {
+                title: 'Liquid Clustering',
+                subtitle: '増分処理でスキューを自動平滑化',
+                steps: ['初期状態', 'クラスタリング有効化', '初回OPTIMIZE', '新規データ到着（スキュー発生）', '増分OPTIMIZE（スキュー解消）', 'クエリ実行']
+            },
+            summary: {
+                title: 'まとめ',
+                subtitle: '3つの最適化手法の比較',
+                steps: []
+            }
+        };
+
+        const regions = ['tokyo', 'osaka', 'hokkaido'];
+        const labels = ['東京都', '大阪府', '北海道'];
+        const cities = {
+            tokyo: ['渋谷区', '新宿区', '港区', '千代田区', '品川区', '目黒区'],
+            osaka: ['大阪市', '堺市', '豊中市', '吹田市', '高槻市', '枚方市'],
+            hokkaido: ['札幌市', '旭川市', '函館市', '小樽市', '帯広市', '釧路市']
+        };
+        let cityIndex = { tokyo: 0, osaka: 0, hokkaido: 0 };
+
+        function switchTab(tab) {
+            currentTab = tab;
+            currentStep = 0;
+            isAnimating = false;
+
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+
+            document.getElementById('mainTitle').textContent = config[tab].title;
+            document.getElementById('mainSubtitle').textContent = config[tab].subtitle;
+
+            document.querySelectorAll('.animation-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById('panel-' + tab).classList.add('active');
+
+            // まとめページでは凡例・ボタン・プログレスバーを非表示、ステージ高さを拡大
+            const isSummary = tab === 'summary';
+            document.querySelector('.legend').style.display = isSummary ? 'none' : 'flex';
+            document.querySelector('.controls').style.display = isSummary ? 'none' : 'flex';
+            document.getElementById('progressBar').style.display = isSummary ? 'none' : 'flex';
+            document.getElementById('stage').style.height = isSummary ? '620px' : '340px';
+
+            buildProgressBar();
+            initAnimation();
+            updateUI();
+        }
+
+        function buildProgressBar() {
+            const bar = document.getElementById('progressBar');
+            const steps = config[currentTab].steps.length;
+            bar.innerHTML = '';
+            for (let i = 0; i < steps; i++) {
+                const seg = document.createElement('div');
+                seg.className = 'progress-segment' + (i === 0 ? ' active' : '');
+                seg.id = 'seg' + i;
+                bar.appendChild(seg);
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('stepNum').textContent = currentStep + 1;
+            document.getElementById('stepLabel').textContent = config[currentTab].steps[currentStep];
+            const steps = config[currentTab].steps.length;
+            for (let i = 0; i < steps; i++) {
+                const seg = document.getElementById('seg' + i);
+                if (seg) seg.classList.toggle('active', i <= currentStep);
+            }
+        }
+
+        function shuffle(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        // ========== PARTITIONING ==========
+        function initPartitioning() {
+            const panel = document.getElementById('panel-partitioning');
+            panel.innerHTML = `
+                <div class="info-box" id="p-info">
+                    <div class="info-step"><span class="num">1</span>初期状態</div>
+                    <div class="info-query" id="p-query"></div>
+                    <div class="info-message" id="p-message">複数ファイルにデータが混在</div>
+                </div>
+            `;
+            data.partitioning = { files: [], blocks: [], partitions: [], stats: [], newBlocks: [] };
+
+            // 初期: 3つのファイルにデータが混在（18ブロック = 各地域6個）
+            const mixedData = [
+                // File 0: 2T, 2O, 2H
+                { file: 0, region: 'tokyo' }, { file: 0, region: 'osaka' }, { file: 0, region: 'hokkaido' },
+                { file: 0, region: 'osaka' }, { file: 0, region: 'tokyo' }, { file: 0, region: 'hokkaido' },
+                // File 1: 2T, 2O, 2H
+                { file: 1, region: 'hokkaido' }, { file: 1, region: 'tokyo' }, { file: 1, region: 'osaka' },
+                { file: 1, region: 'osaka' }, { file: 1, region: 'hokkaido' }, { file: 1, region: 'tokyo' },
+                // File 2: 2T, 2O, 2H
+                { file: 2, region: 'osaka' }, { file: 2, region: 'hokkaido' }, { file: 2, region: 'tokyo' },
+                { file: 2, region: 'hokkaido' }, { file: 2, region: 'osaka' }, { file: 2, region: 'tokyo' }
+            ];
+            data.partitioning.mixedData = mixedData;
+
+            // ターゲット: 地域別パーティションに移動（6 tokyo, 6 osaka, 6 hokkaido）
+            const targetPositions = new Array(18);
+            const tokyoBlocks = [], osakaBlocks = [], hokkaidoBlocks = [];
+            mixedData.forEach((d, i) => {
+                if (d.region === 'tokyo') tokyoBlocks.push(i);
+                else if (d.region === 'osaka') osakaBlocks.push(i);
+                else hokkaidoBlocks.push(i);
+            });
+            tokyoBlocks.forEach((idx, i) => targetPositions[idx] = { partition: 0, slot: i });
+            osakaBlocks.forEach((idx, i) => targetPositions[idx] = { partition: 1, slot: i });
+            hokkaidoBlocks.forEach((idx, i) => targetPositions[idx] = { partition: 2, slot: i });
+            data.partitioning.targetPositions = targetPositions;
+
+            // 初期ファイル（File 1-3）を作成
+            for (let f = 0; f < 3; f++) {
+                const file = document.createElement('div');
+                file.className = 'container-box file';
+                file.id = 'p-file-' + f;
+                file.style.cssText = `width:150px;height:175px;left:${130 + f * 165}px;top:10px;`;
+                file.innerHTML = `<div class="container-label">FILE ${f + 1}</div>`;
+                panel.appendChild(file);
+                data.partitioning.files.push(file);
+            }
+
+            // パーティション（region=東京、大阪、北海道）を作成（初期は非表示）
+            const partLabels = ['region=東京', 'region=大阪', 'region=北海道'];
+            const partClasses = ['tokyo', 'osaka', 'hokkaido'];
+            for (let p = 0; p < 3; p++) {
+                const part = document.createElement('div');
+                part.className = 'container-box partition ' + partClasses[p];
+                part.id = 'p-part-' + p;
+                part.style.cssText = `width:150px;height:175px;left:${130 + p * 165}px;top:10px;opacity:0;`;
+                part.innerHTML = `<div class="container-label">${partLabels[p]}</div>`;
+                panel.appendChild(part);
+                data.partitioning.partitions.push(part);
+            }
+
+            // ブロックをパネルレベルに作成
+            const initFileSlots = [0, 0, 0];
+            const localCityIndex = { tokyo: 0, osaka: 0, hokkaido: 0 };
+            mixedData.forEach((d, i) => {
+                const region = d.region;
+                const pref = labels[regions.indexOf(region)];
+                const city = cities[region][localCityIndex[region] % cities[region].length];
+                localCityIndex[region]++;
+
+                const block = document.createElement('div');
+                block.className = 'data-block panel-level ' + region;
+                block.textContent = `${pref}, ${city}`;
+
+                const fileIdx = d.file;
+                const slotIdx = initFileSlots[fileIdx];
+                initFileSlots[fileIdx]++;
+                const fileLeft = 130 + fileIdx * 165;
+                block.style.left = (fileLeft + 25) + 'px';  // 中央寄せ (150-100)/2=25
+                block.style.top = (10 + 28 + slotIdx * 22) + 'px';
+
+                panel.appendChild(block);
+                data.partitioning.blocks.push({ el: block, region: region, city: city, fileIdx: fileIdx, slotIdx: slotIdx });
+            });
+
+            // 新規ファイル（各パーティションの右に小さいファイルとして表示）
+            const newDataRegions = ['tokyo', 'osaka', 'hokkaido'];
+            const newCities = ['世田谷区', '東大阪市', '室蘭市'];
+            data.partitioning.newFiles = [];
+            newDataRegions.forEach((region, i) => {
+                // 新しい小さいファイルコンテナ（パーティションの右下に小さく表示）
+                const partLeft = 130 + i * 165;
+                const newFile = document.createElement('div');
+                newFile.className = 'container-box file new-file';
+                newFile.style.cssText = `
+                    position: absolute;
+                    width: 60px;
+                    height: 60px;
+                    left: ${partLeft + 155}px;
+                    top: ${10 + 115}px;
+                    opacity: 0;
+                    border: 2px dashed rgba(251, 191, 36, 0.7);
+                    background: rgba(251, 191, 36, 0.08);
+                    z-index: 5;
+                `;
+                newFile.innerHTML = `<div class="container-label" style="font-size:8px;top:4px;left:4px;color:rgba(251,191,36,0.9);">NEW</div>`;
+                panel.appendChild(newFile);
+                data.partitioning.newFiles.push(newFile);
+
+                // 新しいファイル内のブロック
+                const pref = labels[regions.indexOf(region)];
+                const city = newCities[i];
+                const block = document.createElement('div');
+                block.className = 'data-block panel-level ' + region;
+                block.style.cssText = `
+                    width: 50px;
+                    height: 18px;
+                    font-size: 7px;
+                    opacity: 0;
+                    left: ${partLeft + 160}px;
+                    top: ${10 + 115 + 22}px;
+                `;
+                block.textContent = `${pref.slice(0,2)}, ${city.slice(0,3)}`;
+                panel.appendChild(block);
+                data.partitioning.newBlocks.push({ el: block, region: region, city: city, partitionIdx: i });
+            });
+        }
+
+        function partitioningStep(step) {
+            const d = data.partitioning;
+            const info = document.getElementById('p-info');
+            const stepEl = info.querySelector('.info-step');
+            const queryEl = document.getElementById('p-query');
+            const msgEl = document.getElementById('p-message');
+            const steps = config.partitioning.steps;
+
+            if (step === 0) {
+                // リセット: 初期ファイル表示、パーティション非表示
+                d.files.forEach(f => { f.style.opacity = '1'; f.classList.remove('faded'); });
+                d.partitions.forEach(p => { p.style.opacity = '0'; p.classList.remove('visible', 'faded', 'highlighted'); });
+
+                // 小パーティションを削除
+                const panel = document.getElementById('panel-partitioning');
+                panel.querySelectorAll('.mini-partition').forEach(el => el.remove());
+
+                const fileSlots = [0, 0, 0];
+                d.blocks.forEach((b, i) => {
+                    const md = d.mixedData[i];
+                    const fileIdx = md.file;
+                    const slotIdx = fileSlots[fileIdx];
+                    fileSlots[fileIdx]++;
+                    b.fileIdx = fileIdx;
+                    b.slotIdx = slotIdx;
+                    b.partitionIdx = undefined;
+                    b.el.className = 'data-block panel-level ' + b.region;
+                    b.el.classList.remove('faded');
+                    const fileLeft = 130 + fileIdx * 165;
+                    b.el.style.left = (fileLeft + 25) + 'px';  // 中央寄せ
+                    b.el.style.top = (10 + 28 + slotIdx * 22) + 'px';
+                    b.el.style.opacity = '1';
+                });
+
+                // 新規ファイル・ブロックをリセット（非表示）
+                d.newFiles.forEach(f => {
+                    f.style.opacity = '0';
+                });
+                d.newBlocks.forEach(b => {
+                    b.el.style.opacity = '0';
+                });
+
+                stepEl.innerHTML = `<span class="num">1</span>${steps[0]}`;
+                queryEl.innerHTML = '';
+                msgEl.textContent = '3つのファイルに東京・大阪・北海道がバラバラに混在';
+                msgEl.className = 'info-message';
+            } else if (step === 1) {
+                // パーティション作成: ファイルをフェードアウト、パーティションをフェードイン
+                d.files.forEach((f, i) => setTimeout(() => { f.style.opacity = '0'; }, i * 100));
+                setTimeout(() => {
+                    d.partitions.forEach((p, i) => setTimeout(() => { p.style.opacity = '1'; p.classList.add('visible'); }, i * 150));
+                }, 400);
+
+                stepEl.innerHTML = `<span class="num">2</span>${steps[1]}`;
+                queryEl.innerHTML = '<span class="command">PARTITION BY</span> (region)';
+                msgEl.textContent = '地域ごとにパーティションフォルダを作成';
+                msgEl.className = 'info-message';
+            } else if (step === 2) {
+                // データ移動: ブロックをパーティションに移動（縦1列）
+                isAnimating = true;
+                const partitionLefts = [130, 295, 460];
+
+                d.blocks.forEach((b, i) => {
+                    const target = d.targetPositions[i];
+                    const partIdx = target.partition;
+                    const slotIdx = target.slot;
+
+                    setTimeout(() => {
+                        b.el.style.opacity = '0.5';
+                        b.el.style.left = (partitionLefts[partIdx] + 25) + 'px';  // 中央寄せ
+                        b.el.style.top = (10 + 28 + slotIdx * 22) + 'px';
+                        b.partitionIdx = partIdx;
+                        b.slotIdx = slotIdx;
+                        setTimeout(() => { b.el.style.opacity = '1'; }, 400);
+                    }, i * 60);
+                });
+
+                setTimeout(() => { isAnimating = false; }, d.blocks.length * 60 + 500);
+
+                stepEl.innerHTML = `<span class="num">3</span>${steps[2]}`;
+                queryEl.innerHTML = '';
+                msgEl.textContent = '🔄 各データを該当パーティションに移動';
+                msgEl.className = 'info-message';
+            } else if (step === 3) {
+                // 完了
+                stepEl.innerHTML = `<span class="num">4</span>${steps[3]}`;
+                queryEl.innerHTML = '';
+                msgEl.textContent = '✓ 物理的に分離完了';
+                msgEl.className = 'info-message success';
+            } else if (step === 4) {
+                // 新規データ到着（各パーティション内に新しい小さいファイルが作成される）
+                d.newFiles.forEach((f, i) => {
+                    setTimeout(() => {
+                        f.style.opacity = '1';
+                    }, i * 150);
+                });
+                d.newBlocks.forEach((b, i) => {
+                    setTimeout(() => {
+                        b.el.style.opacity = '1';
+                    }, i * 150 + 100);
+                });
+
+                stepEl.innerHTML = `<span class="num">5</span>${steps[4]}`;
+                queryEl.innerHTML = '';
+                msgEl.innerHTML = '📥 新規データ → 各パーティションに<strong>小さい新ファイル</strong>が増える...';
+                msgEl.className = 'info-message warning';
+            } else if (step === 5) {
+                // クエリ実行（パーティションキーで絞り込み → 効く）
+                d.partitions[0].classList.add('highlighted');
+                d.partitions[1].classList.add('faded');
+                d.partitions[2].classList.add('faded');
+
+                // 新規ファイルも同様
+                d.newFiles[0].style.opacity = '1';
+                d.newFiles[1].style.opacity = '0.15';
+                d.newFiles[2].style.opacity = '0.15';
+
+                // 東京以外のブロックをfaded（直接opacityを設定）
+                d.blocks.forEach(b => {
+                    if (b.region === 'tokyo') {
+                        b.el.style.opacity = '1';
+                    } else {
+                        b.el.style.opacity = '0.15';
+                    }
+                });
+                // 新規ブロックも同様
+                d.newBlocks.forEach(b => {
+                    if (b.region === 'tokyo') {
+                        b.el.style.opacity = '1';
+                    } else {
+                        b.el.style.opacity = '0.15';
+                    }
+                });
+
+                stepEl.innerHTML = `<span class="num">6</span>${steps[5]}`;
+                queryEl.innerHTML = '<span class="keyword">WHERE</span> region = <span class="value">\'東京\'</span>';
+                msgEl.textContent = '⚡ 東京パーティションだけ読む（でも小さいファイルが多いと遅い...）';
+                msgEl.className = 'info-message';
+            } else if (step === 6) {
+                // 別のクエリ（パーティションキー以外 → 効かない）
+                d.partitions.forEach(p => {
+                    p.classList.remove('faded', 'highlighted');
+                    p.classList.add('highlighted');
+                });
+                d.newFiles.forEach(f => {
+                    f.style.opacity = '1';
+                });
+                d.blocks.forEach(b => {
+                    b.el.style.opacity = '1';
+                });
+                d.newBlocks.forEach(b => {
+                    b.el.style.opacity = '1';
+                });
+
+                stepEl.innerHTML = `<span class="num">7</span>${steps[6]}`;
+                queryEl.innerHTML = '<span class="keyword">WHERE</span> date = <span class="value">\'2024-01-01\'</span>';
+                msgEl.innerHTML = '⚠️ パーティションキー以外 → <strong>全フォルダ・全ファイル読む必要あり！</strong>';
+                msgEl.className = 'info-message warning';
+            } else if (step === 7) {
+                // 高カーディナリティ問題の視覚化
+                // パーティションを小さいフォルダに分割して表示
+                d.partitions.forEach(p => {
+                    p.classList.remove('highlighted');
+                    p.style.opacity = '0';
+                });
+                d.newFiles.forEach(f => {
+                    f.style.opacity = '0';
+                });
+                d.blocks.forEach(b => {
+                    b.el.style.opacity = '0';
+                });
+                d.newBlocks.forEach(b => {
+                    b.el.style.opacity = '0';
+                });
+
+                // 小さいパーティションをたくさん表示（user_idでパーティションした場合のイメージ）
+                const panel = document.getElementById('panel-partitioning');
+
+                // 既存の小パーティションを削除
+                panel.querySelectorAll('.mini-partition').forEach(el => el.remove());
+
+                const miniLabels = ['user=001', 'user=002', 'user=003', 'user=004', 'user=005', 'user=006', 'user=007', 'user=008', '...', 'user=999'];
+                miniLabels.forEach((label, i) => {
+                    const mini = document.createElement('div');
+                    mini.className = 'mini-partition';
+                    mini.style.cssText = `
+                        position: absolute;
+                        width: 75px;
+                        height: 50px;
+                        left: ${60 + (i % 10) * 80}px;
+                        top: ${40 + Math.floor(i / 10) * 60}px;
+                        background: rgba(255, 255, 255, 0.03);
+                        border: 1px solid rgba(255, 255, 255, 0.15);
+                        border-radius: 6px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 9px;
+                        color: rgba(255, 255, 255, 0.5);
+                    `;
+                    mini.textContent = label;
+                    panel.appendChild(mini);
+                });
+
+                stepEl.innerHTML = `<span class="num">8</span>${steps[7]}`;
+                queryEl.innerHTML = '<span class="command">PARTITION BY</span> (user_id)';
+                msgEl.innerHTML = '💀 ユニーク値が多い列 → <strong>小さいフォルダが大量発生！</strong>性能劣化';
+                msgEl.className = 'info-message warning';
+            }
+        }
+
+        // ========== ZORDER ==========
+        function initZorder() {
+            const panel = document.getElementById('panel-zorder');
+            panel.innerHTML = `
+                <div class="info-box" id="z-info">
+                    <div class="info-step"><span class="num">1</span>初期状態</div>
+                    <div class="info-query" id="z-query"></div>
+                    <div class="info-message" id="z-message">各ファイルに東京・大阪・北海道がバラバラに混在</div>
+                </div>
+            `;
+            data.zorder = { files: [], blocks: [], stats: [], newFiles: [], newBlocks: [], newStats: [] };
+
+            // Before: Mixed data in each file (total 24 blocks)
+            const mixedData = [
+                // File 0
+                { file: 0, region: 'tokyo' }, { file: 0, region: 'osaka' }, { file: 0, region: 'hokkaido' },
+                { file: 0, region: 'osaka' }, { file: 0, region: 'tokyo' }, { file: 0, region: 'hokkaido' },
+                // File 1
+                { file: 1, region: 'hokkaido' }, { file: 1, region: 'tokyo' }, { file: 1, region: 'osaka' },
+                { file: 1, region: 'tokyo' }, { file: 1, region: 'hokkaido' }, { file: 1, region: 'osaka' },
+                // File 2
+                { file: 2, region: 'osaka' }, { file: 2, region: 'hokkaido' }, { file: 2, region: 'tokyo' },
+                { file: 2, region: 'hokkaido' }, { file: 2, region: 'osaka' }, { file: 2, region: 'tokyo' },
+                // File 3
+                { file: 3, region: 'tokyo' }, { file: 3, region: 'hokkaido' }, { file: 3, region: 'osaka' },
+                { file: 3, region: 'hokkaido' }, { file: 3, region: 'tokyo' }, { file: 3, region: 'osaka' }
+            ];
+
+            // Calculate target positions: group by region (blocks keep their identity, just move)
+            // Tokyo: 8 blocks, Osaka: 8 blocks, Hokkaido: 8 blocks
+            // Target: File 0 = Tokyo, File 1 = Osaka, File 2 = Hokkaido, File 3 = overflow
+            const tokyoBlocks = [], osakaBlocks = [], hokkaidoBlocks = [];
+            mixedData.forEach((d, i) => {
+                if (d.region === 'tokyo') tokyoBlocks.push(i);
+                else if (d.region === 'osaka') osakaBlocks.push(i);
+                else hokkaidoBlocks.push(i);
+            });
+
+            const targetPositions = new Array(24);
+            // Tokyo → File 0 (first 6), File 3 slots 0-1 (remaining 2)
+            tokyoBlocks.slice(0, 6).forEach((idx, i) => targetPositions[idx] = { file: 0, slot: i });
+            tokyoBlocks.slice(6).forEach((idx, i) => targetPositions[idx] = { file: 3, slot: i });
+            // Osaka → File 1 (first 6), File 3 slots 2-3 (remaining 2)
+            osakaBlocks.slice(0, 6).forEach((idx, i) => targetPositions[idx] = { file: 1, slot: i });
+            osakaBlocks.slice(6).forEach((idx, i) => targetPositions[idx] = { file: 3, slot: 2 + i });
+            // Hokkaido → File 2 (first 6), File 3 slots 4-5 (remaining 2)
+            hokkaidoBlocks.slice(0, 6).forEach((idx, i) => targetPositions[idx] = { file: 2, slot: i });
+            hokkaidoBlocks.slice(6).forEach((idx, i) => targetPositions[idx] = { file: 3, slot: 4 + i });
+
+            data.zorder.mixedData = mixedData;
+            data.zorder.targetPositions = targetPositions;
+
+            // 6ファイル横並びレイアウト用の位置計算
+            const fileWidth = 120;
+            const fileSpacing = 138;
+            const fileStartX = 25;
+            const allFileLefts = [0, 1, 2, 3, 4, 5].map(i => fileStartX + i * fileSpacing);
+
+            // Create file containers (File 1-4)
+            for (let f = 0; f < 4; f++) {
+                const file = document.createElement('div');
+                file.className = 'container-box file';
+                file.id = 'z-file-' + f;
+                file.style.cssText = `width:${fileWidth}px;height:175px;left:${allFileLefts[f]}px;top:10px;`;
+                file.innerHTML = `<div class="container-label">FILE ${f + 1}</div>`;
+                panel.appendChild(file);
+                data.zorder.files.push(file);
+
+                const statsEl = document.createElement('div');
+                statsEl.className = 'file-stats';
+                file.appendChild(statsEl);
+                data.zorder.stats.push(statsEl);
+            }
+
+            // Create data blocks at panel level (for cross-file animation)
+            const initFileSlots = [0, 0, 0, 0];
+            cityIndex = { tokyo: 0, osaka: 0, hokkaido: 0 };
+            mixedData.forEach((d, i) => {
+                const region = d.region;
+                const pref = labels[regions.indexOf(region)];
+                const city = cities[region][cityIndex[region] % cities[region].length];
+                cityIndex[region]++;
+
+                const block = document.createElement('div');
+                block.className = 'data-block panel-level ' + region;
+                block.textContent = `${pref}, ${city}`;
+
+                const fileIdx = d.file;
+                const slotIdx = initFileSlots[fileIdx];
+                initFileSlots[fileIdx]++;
+                block.style.left = (allFileLefts[fileIdx] + 10) + 'px';
+                block.style.top = (10 + 28 + slotIdx * 22) + 'px';
+
+                panel.appendChild(block);
+                data.zorder.blocks.push({ el: block, region: region, city: city, fileIdx: fileIdx, slotIdx: slotIdx });
+            });
+
+            // 新規ファイル用データ（File 5-6、後から到着）
+            const newMixedData = [
+                { file: 0, region: 'tokyo' }, { file: 0, region: 'osaka' }, { file: 0, region: 'hokkaido' },
+                { file: 0, region: 'osaka' }, { file: 0, region: 'tokyo' }, { file: 0, region: 'hokkaido' },
+                { file: 1, region: 'hokkaido' }, { file: 1, region: 'osaka' }, { file: 1, region: 'tokyo' },
+                { file: 1, region: 'osaka' }, { file: 1, region: 'hokkaido' }, { file: 1, region: 'tokyo' }
+            ];
+            data.zorder.newMixedData = newMixedData;
+            data.zorder.allFileLefts = allFileLefts;
+
+            // 新規ファイルコンテナ（File 5-6、横並び）
+            for (let f = 0; f < 2; f++) {
+                const file = document.createElement('div');
+                file.className = 'container-box file new-file';
+                file.id = 'z-new-' + f;
+                file.style.cssText = `width:${fileWidth}px;height:175px;left:${allFileLefts[4 + f]}px;top:10px;opacity:0;`;
+                file.innerHTML = `<div class="container-label">FILE ${f + 5}</div>`;
+                panel.appendChild(file);
+                data.zorder.newFiles.push(file);
+
+                const statsEl = document.createElement('div');
+                statsEl.className = 'file-stats';
+                file.appendChild(statsEl);
+                data.zorder.newStats.push(statsEl);
+            }
+
+            // 新規ファイル用ブロック（初期は非表示）
+            const newInitFileSlots = [0, 0];
+            newMixedData.forEach((d, i) => {
+                const region = d.region;
+                const pref = labels[regions.indexOf(region)];
+                const city = cities[region][cityIndex[region] % cities[region].length];
+                cityIndex[region]++;
+
+                const block = document.createElement('div');
+                block.className = 'data-block panel-level ' + region;
+                block.textContent = `${pref}, ${city}`;
+                block.style.opacity = '0';
+
+                const fileIdx = d.file;
+                const slotIdx = newInitFileSlots[fileIdx];
+                newInitFileSlots[fileIdx]++;
+                block.style.left = (allFileLefts[4 + fileIdx] + 10) + 'px';
+                block.style.top = (10 + 28 + slotIdx * 22) + 'px';
+
+                panel.appendChild(block);
+                data.zorder.newBlocks.push({ el: block, region: region, city: city, fileIdx: fileIdx, slotIdx: slotIdx });
+            });
+        }
+
+        function zorderStep(step) {
+            const d = data.zorder;
+            const info = document.getElementById('z-info');
+            const stepEl = info.querySelector('.info-step');
+            const queryEl = document.getElementById('z-query');
+            const msgEl = document.getElementById('z-message');
+            const steps = config.zorder.steps;
+
+            if (step === 0) {
+                const allFileLefts = d.allFileLefts;
+                d.files.forEach(f => f.classList.remove('highlighted', 'faded', 'processing', 'optimized'));
+                d.newFiles.forEach(f => { f.style.opacity = '0'; f.classList.remove('highlighted', 'faded', 'processing', 'optimized'); f.classList.add('new-file'); });
+                // Reset stats
+                d.stats.forEach(s => { s.classList.remove('visible'); s.innerHTML = ''; });
+                d.newStats.forEach(s => { s.classList.remove('visible'); s.innerHTML = ''; });
+                // Reset blocks to mixed positions
+                const fileSlots = [0, 0, 0, 0];
+                cityIndex = { tokyo: 0, osaka: 0, hokkaido: 0 };
+                d.blocks.forEach((b, i) => {
+                    const md = d.mixedData[i];
+                    const region = md.region;
+                    const fileIdx = md.file;
+                    const slotIdx = fileSlots[fileIdx];
+                    fileSlots[fileIdx]++;
+                    const pref = labels[regions.indexOf(region)];
+                    const city = cities[region][cityIndex[region] % cities[region].length];
+                    cityIndex[region]++;
+                    b.region = region;
+                    b.city = city;
+                    b.fileIdx = fileIdx;
+                    b.slotIdx = slotIdx;
+                    b.el.className = 'data-block panel-level ' + region;
+                    b.el.textContent = `${pref}, ${city}`;
+                    b.el.classList.remove('faded');
+                    b.el.style.left = (allFileLefts[fileIdx] + 10) + 'px';
+                    b.el.style.top = (10 + 28 + slotIdx * 22) + 'px';
+                    b.el.style.opacity = '1';
+                });
+                // Reset new blocks (hidden)
+                const newFileSlots = [0, 0];
+                d.newBlocks.forEach((b, i) => {
+                    const md = d.newMixedData[i];
+                    const fileIdx = md.file;
+                    const slotIdx = newFileSlots[fileIdx];
+                    newFileSlots[fileIdx]++;
+                    b.fileIdx = fileIdx;
+                    b.slotIdx = slotIdx;
+                    b.el.className = 'data-block panel-level ' + b.region;
+                    b.el.classList.remove('faded');
+                    b.el.style.left = (allFileLefts[4 + fileIdx] + 10) + 'px';
+                    b.el.style.top = (10 + 28 + slotIdx * 22) + 'px';
+                    b.el.style.opacity = '0';
+                });
+                stepEl.innerHTML = `<span class="num">1</span>${steps[0]}`;
+                queryEl.innerHTML = '';
+                msgEl.textContent = '各ファイルに東京都・大阪府・北海道がバラバラに混在';
+                msgEl.className = 'info-message';
+            } else if (step === 1) {
+                d.files.forEach(f => f.classList.add('highlighted'));
+                stepEl.innerHTML = `<span class="num">2</span>${steps[1]}`;
+                queryEl.innerHTML = '<span class="keyword">WHERE</span> region = <span class="value">\'東京\'</span>';
+                msgEl.textContent = '⚠️ 全ファイルに東京が散在 → 4ファイル全部読む必要あり';
+                msgEl.className = 'info-message warning';
+            } else if (step === 2) {
+                isAnimating = true;
+                const allFileLefts = d.allFileLefts;
+                d.files.forEach(f => {
+                    f.classList.remove('highlighted');
+                    f.classList.add('processing');
+                });
+
+                // Animate blocks moving to their new file positions (blocks keep their identity)
+                d.blocks.forEach((b, i) => {
+                    const target = d.targetPositions[i];
+                    const newFileIdx = target.file;
+                    const newSlotIdx = target.slot;
+
+                    setTimeout(() => {
+                        b.el.style.opacity = '0.5';
+                        b.el.style.left = (allFileLefts[newFileIdx] + 10) + 'px';
+                        b.el.style.top = (10 + 28 + newSlotIdx * 22) + 'px';
+                        b.fileIdx = newFileIdx;
+                        b.slotIdx = newSlotIdx;
+                        setTimeout(() => {
+                            b.el.style.opacity = '1';
+                        }, 400);
+                    }, i * 80);
+                });
+
+                setTimeout(() => {
+                    d.files.forEach(f => f.classList.remove('processing'));
+                    isAnimating = false;
+                }, d.blocks.length * 80 + 500);
+
+                stepEl.innerHTML = `<span class="num">3</span>${steps[2]}`;
+                queryEl.innerHTML = '<span class="command">OPTIMIZE ZORDER BY</span> (region)';
+                msgEl.textContent = '🔄 全4ファイルを書き換え中（ファイル間でデータ再配置）...';
+                msgEl.className = 'info-message';
+            } else if (step === 3) {
+                d.files.forEach(f => f.classList.add('optimized'));
+                // Show min/max stats on each file
+                // File 0: Tokyo only, File 1: Osaka only, File 2: Hokkaido only, File 3: Mixed
+                const statsInfo = [
+                    { min: '東京', max: '東京' },      // File 1: 東京のみ
+                    { min: '大阪', max: '大阪' },      // File 2: 大阪のみ
+                    { min: '北海道', max: '北海道' },  // File 3: 北海道のみ
+                    { min: '大阪', max: '北海道' }     // File 4: 混在（東京+大阪+北海道）
+                ];
+                d.stats.forEach((s, i) => {
+                    s.innerHTML = `<span class="stat-label">min:</span><span class="stat-value">${statsInfo[i].min}</span><span class="stat-label">max:</span><span class="stat-value">${statsInfo[i].max}</span>`;
+                    s.classList.add('visible');
+                });
+                stepEl.innerHTML = `<span class="num">4</span>${steps[3]}`;
+                queryEl.innerHTML = '';
+                msgEl.innerHTML = '✓ 完了。でも<strong>次回も全ファイル再書き換え必要</strong> → 運用コスト高い...';
+                msgEl.className = 'info-message warning';
+            } else if (step === 4) {
+                // 新規データ到着
+                d.newFiles.forEach((f, i) => setTimeout(() => { f.style.opacity = '1'; }, i * 150));
+                d.newBlocks.forEach((b, i) => setTimeout(() => { b.el.style.opacity = '1'; }, 300 + i * 50));
+                stepEl.innerHTML = `<span class="num">5</span>${steps[4]}`;
+                queryEl.innerHTML = '';
+                msgEl.textContent = '📥 File 5, 6 が新規到着（まだZORDERされていない）';
+                msgEl.className = 'info-message warning';
+            } else if (step === 5) {
+                // 再OPTIMIZE - 全ファイル（既存4 + 新規2 = 6ファイル）を再書き換え
+                isAnimating = true;
+                d.files.forEach(f => { f.classList.remove('optimized'); f.classList.add('processing'); });
+                d.newFiles.forEach(f => { f.classList.remove('new-file'); f.classList.add('processing'); });
+
+                // 全ブロック（既存+新規）をまとめてシャッフルして再配置
+                const allBlocks = [...d.blocks, ...d.newBlocks];
+                const totalCount = allBlocks.length; // 24 + 12 = 36
+
+                // 処理中の視覚効果（全ファイルが点滅）
+                allBlocks.forEach((b, i) => {
+                    setTimeout(() => {
+                        b.el.style.opacity = '0.5';
+                        setTimeout(() => { b.el.style.opacity = '1'; }, 300);
+                    }, i * 30);
+                });
+
+                // 新規ファイルにもmin/max統計を表示
+                const newStatsInfo = [
+                    { min: '大阪', max: '東京' },    // File 5: 混在
+                    { min: '大阪', max: '東京' }     // File 6: 混在
+                ];
+
+                setTimeout(() => {
+                    d.files.forEach(f => { f.classList.remove('processing'); f.classList.add('optimized'); });
+                    d.newFiles.forEach((f, i) => {
+                        f.classList.remove('processing');
+                        f.classList.add('optimized');
+                        d.newStats[i].innerHTML = `<span class="stat-label">min:</span><span class="stat-value">${newStatsInfo[i].min}</span><span class="stat-label">max:</span><span class="stat-value">${newStatsInfo[i].max}</span>`;
+                        d.newStats[i].classList.add('visible');
+                    });
+                    isAnimating = false;
+                }, totalCount * 30 + 500);
+
+                stepEl.innerHTML = `<span class="num">6</span>${steps[5]}`;
+                queryEl.innerHTML = '<span class="command">OPTIMIZE ZORDER BY</span> (region)';
+                msgEl.innerHTML = '💀 <strong>全6ファイル</strong>を再書き換え！（既存も含めて全部やり直し）';
+                msgEl.className = 'info-message warning';
+            } else if (step === 6) {
+                // ファイルレベルのスキップ判定（min/max統計を見て判断）
+                // 最適化後: File 0,3 は東京あり、File 1,2 は東京なし、新規File 0,1 も東京あり
+                const fileHasTokyo = [true, false, false, true];
+                const newFileHasTokyo = [true, true];
+
+                d.files.forEach((f, i) => {
+                    f.classList.remove('optimized');
+                    if (fileHasTokyo[i]) {
+                        f.classList.remove('faded');
+                        f.classList.add('highlighted');
+                    } else {
+                        f.classList.add('faded');
+                        f.classList.remove('highlighted');
+                    }
+                });
+                d.newFiles.forEach((f, i) => {
+                    f.classList.remove('optimized');
+                    if (newFileHasTokyo[i]) {
+                        f.classList.remove('faded');
+                        f.classList.add('highlighted');
+                    } else {
+                        f.classList.add('faded');
+                        f.classList.remove('highlighted');
+                    }
+                });
+
+                // クエリ結果を表示
+                d.blocks.forEach(b => {
+                    b.el.style.opacity = '';
+                    if (!fileHasTokyo[b.fileIdx]) {
+                        b.el.style.opacity = '0.15';
+                    } else if (b.region === 'tokyo') {
+                        b.el.style.opacity = '1';
+                    } else {
+                        b.el.style.opacity = '0.15';
+                    }
+                });
+                d.newBlocks.forEach(b => {
+                    b.el.style.opacity = '';
+                    if (!newFileHasTokyo[b.fileIdx]) {
+                        b.el.style.opacity = '0.15';
+                    } else if (b.region === 'tokyo') {
+                        b.el.style.opacity = '1';
+                    } else {
+                        b.el.style.opacity = '0.15';
+                    }
+                });
+
+                stepEl.innerHTML = `<span class="num">7</span>${steps[6]}`;
+                queryEl.innerHTML = '<span class="keyword">WHERE</span> region = <span class="value">\'東京\'</span>';
+                msgEl.innerHTML = '⚡ クエリは速い。でも<strong>毎回全ファイル書き換え</strong>が辛い... → Liquid推奨！';
+                msgEl.className = 'info-message warning';
+            }
+        }
+
+        // ========== LIQUID CLUSTERING ==========
+        function initLiquid() {
+            const panel = document.getElementById('panel-liquid');
+            panel.innerHTML = `
+                <div class="info-box" id="l-info">
+                    <div class="info-step"><span class="num">1</span>初期状態</div>
+                    <div class="info-query" id="l-query"></div>
+                    <div class="info-message" id="l-message">各ファイルにデータがバラバラに格納</div>
+                </div>
+            `;
+            data.liquid = { files: [], blocks: [], newFiles: [], newBlocks: [], stats: [], newStats: [] };
+
+            // Mixed data for existing files (18 blocks total)
+            const mixedData = [
+                // File 0: 2T, 2O, 2H
+                { file: 0, region: 'osaka' }, { file: 0, region: 'tokyo' }, { file: 0, region: 'hokkaido' },
+                { file: 0, region: 'tokyo' }, { file: 0, region: 'osaka' }, { file: 0, region: 'hokkaido' },
+                // File 1: 2T, 2O, 2H
+                { file: 1, region: 'hokkaido' }, { file: 1, region: 'osaka' }, { file: 1, region: 'tokyo' },
+                { file: 1, region: 'osaka' }, { file: 1, region: 'hokkaido' }, { file: 1, region: 'tokyo' },
+                // File 2: 0T, 3O, 3H (東京なし)
+                { file: 2, region: 'osaka' }, { file: 2, region: 'hokkaido' }, { file: 2, region: 'osaka' },
+                { file: 2, region: 'hokkaido' }, { file: 2, region: 'osaka' }, { file: 2, region: 'hokkaido' }
+            ];
+
+            // Mixed data for new files (5 blocks total - 小さい増分データ)
+            const newMixedData = [
+                // File 4: 小さいファイル（3ブロック）
+                { file: 0, region: 'tokyo' }, { file: 0, region: 'osaka' }, { file: 0, region: 'hokkaido' },
+                // File 5: さらに小さいファイル（2ブロック、東京なし）
+                { file: 1, region: 'osaka' }, { file: 1, region: 'hokkaido' }
+            ];
+            data.liquid.mixedData = mixedData;
+            data.liquid.newMixedData = newMixedData;
+
+            // Calculate target positions for existing files (group by region)
+            // 4T, 7O, 7H → File 0: 4T+2O, File 1: 5O+1H, File 2: 6H
+            const tokyoBlocks = [], osakaBlocks = [], hokkaidoBlocks = [];
+            mixedData.forEach((d, i) => {
+                if (d.region === 'tokyo') tokyoBlocks.push(i);
+                else if (d.region === 'osaka') osakaBlocks.push(i);
+                else hokkaidoBlocks.push(i);
+            });
+            const targetPositions = new Array(18);
+            tokyoBlocks.forEach((idx, i) => targetPositions[idx] = { file: 0, slot: i });
+            osakaBlocks.slice(0, 2).forEach((idx, i) => targetPositions[idx] = { file: 0, slot: 4 + i });
+            osakaBlocks.slice(2, 7).forEach((idx, i) => targetPositions[idx] = { file: 1, slot: i });
+            hokkaidoBlocks.slice(0, 1).forEach((idx, i) => targetPositions[idx] = { file: 1, slot: 5 + i });
+            hokkaidoBlocks.slice(1, 7).forEach((idx, i) => targetPositions[idx] = { file: 2, slot: i });
+            data.liquid.targetPositions = targetPositions;
+
+            // Calculate target positions for new files (5ブロック)
+            // File 4: 1T+1O+1H, File 5: 1O+1H
+            const newTokyoBlocks = [], newOsakaBlocks = [], newHokkaidoBlocks = [];
+            newMixedData.forEach((d, i) => {
+                if (d.region === 'tokyo') newTokyoBlocks.push(i);
+                else if (d.region === 'osaka') newOsakaBlocks.push(i);
+                else newHokkaidoBlocks.push(i);
+            });
+            const newTargetPositions = new Array(5);
+            // File 4: tokyo(1), osaka(1), hokkaido(1) → 地域でソート
+            newTokyoBlocks.forEach((idx, i) => newTargetPositions[idx] = { file: 0, slot: i });
+            newOsakaBlocks.slice(0, 1).forEach((idx, i) => newTargetPositions[idx] = { file: 0, slot: 1 + i });
+            newHokkaidoBlocks.slice(0, 1).forEach((idx, i) => newTargetPositions[idx] = { file: 0, slot: 2 + i });
+            // File 5: osaka(1), hokkaido(1)
+            newOsakaBlocks.slice(1, 2).forEach((idx, i) => newTargetPositions[idx] = { file: 1, slot: i });
+            newHokkaidoBlocks.slice(1, 2).forEach((idx, i) => newTargetPositions[idx] = { file: 1, slot: 1 + i });
+            data.liquid.newTargetPositions = newTargetPositions;
+
+            // Create file containers (File 1-3)
+            for (let f = 0; f < 3; f++) {
+                const file = document.createElement('div');
+                file.className = 'container-box file';
+                file.id = 'l-file-' + f;
+                file.style.cssText = `width:150px;height:175px;left:${65 + f * 160}px;top:10px;`;
+                file.innerHTML = `<div class="container-label">FILE ${f + 1}</div>`;
+                panel.appendChild(file);
+                data.liquid.files.push(file);
+
+                const statsEl = document.createElement('div');
+                statsEl.className = 'file-stats';
+                file.appendChild(statsEl);
+                data.liquid.stats.push(statsEl);
+            }
+
+            // Create blocks at panel level for existing files
+            const initFileSlots = [0, 0, 0];
+            cityIndex = { tokyo: 0, osaka: 0, hokkaido: 0 };
+            mixedData.forEach((d, i) => {
+                const region = d.region;
+                const pref = labels[regions.indexOf(region)];
+                const city = cities[region][cityIndex[region] % cities[region].length];
+                cityIndex[region]++;
+
+                const block = document.createElement('div');
+                block.className = 'data-block panel-level ' + region;
+                block.textContent = `${pref}, ${city}`;
+
+                const fileIdx = d.file;
+                const slotIdx = initFileSlots[fileIdx];
+                initFileSlots[fileIdx]++;
+                const fileLeft = 65 + fileIdx * 160;
+                block.style.left = (fileLeft + 25) + 'px';  // 中央寄せ
+                block.style.top = (10 + 28 + slotIdx * 22) + 'px';
+
+                panel.appendChild(block);
+                data.liquid.blocks.push({ el: block, region: region, city: city, fileIdx: fileIdx, slotIdx: slotIdx });
+            });
+
+            // Create new file containers (File 4-5, initially hidden) - 小さいファイルで増分データを表現
+            const newFileSizes = [{ width: 100, height: 70 }, { width: 80, height: 55 }];  // 小さいサイズ
+            for (let f = 0; f < 2; f++) {
+                const file = document.createElement('div');
+                file.className = 'container-box file new-file';
+                file.id = 'l-new-' + f;
+                file.style.cssText = `width:${newFileSizes[f].width}px;height:${newFileSizes[f].height}px;left:${550 + f * 110}px;top:${10 + 105}px;opacity:0;`;
+                file.innerHTML = `<div class="container-label" style="font-size:9px;">FILE ${f + 4}</div>`;
+                panel.appendChild(file);
+                data.liquid.newFiles.push(file);
+
+                const statsEl = document.createElement('div');
+                statsEl.className = 'file-stats';
+                file.appendChild(statsEl);
+                data.liquid.newStats.push(statsEl);
+            }
+
+            // Create blocks for new files (initially hidden) - 小さいブロック
+            const newInitFileSlots = [0, 0];
+            const newFileLefts = [550, 550 + 110];
+            const newFileBlockWidth = 70;
+            newMixedData.forEach((d, i) => {
+                const region = d.region;
+                const pref = labels[regions.indexOf(region)];
+                const city = cities[region][cityIndex[region] % cities[region].length];
+                cityIndex[region]++;
+
+                const block = document.createElement('div');
+                block.className = 'data-block panel-level ' + region;
+                block.style.cssText = `
+                    width: ${newFileBlockWidth}px;
+                    height: 16px;
+                    font-size: 7px;
+                    opacity: 0;
+                `;
+                block.textContent = `${pref.slice(0,2)}, ${city.slice(0,3)}`;
+
+                const fileIdx = d.file;
+                const slotIdx = newInitFileSlots[fileIdx];
+                newInitFileSlots[fileIdx]++;
+                block.style.left = (newFileLefts[fileIdx] + 5) + 'px';
+                block.style.top = (10 + 105 + 22 + slotIdx * 18) + 'px';
+
+                panel.appendChild(block);
+                data.liquid.newBlocks.push({ el: block, region: region, city: city, fileIdx: fileIdx, slotIdx: slotIdx });
+            });
+        }
+
+        function liquidStep(step) {
+            const d = data.liquid;
+            const info = document.getElementById('l-info');
+            const stepEl = info.querySelector('.info-step');
+            const queryEl = document.getElementById('l-query');
+            const msgEl = document.getElementById('l-message');
+            const steps = config.liquid.steps;
+
+            if (step === 0) {
+                // Reset files
+                d.files.forEach(f => {
+                    f.classList.remove('highlighted', 'faded', 'processing', 'optimized');
+                    f.style.opacity = '1';
+                    f.style.height = '175px';
+                });
+                // 新規ファイルを元の小さいサイズに戻す
+                const newFileSizes = [{ width: 100, height: 70 }, { width: 80, height: 55 }];
+                d.newFiles.forEach((f, i) => {
+                    f.style.opacity = '0';
+                    f.style.width = newFileSizes[i].width + 'px';
+                    f.style.height = newFileSizes[i].height + 'px';
+                    f.style.top = (10 + 105) + 'px';
+                    f.innerHTML = `<div class="container-label" style="font-size:9px;">FILE ${i + 4}</div>`;
+                    f.classList.remove('highlighted', 'faded', 'processing', 'optimized');
+                    f.classList.add('new-file');
+                    // statsを再追加
+                    if (!f.querySelector('.file-stats')) {
+                        const statsEl = document.createElement('div');
+                        statsEl.className = 'file-stats';
+                        f.appendChild(statsEl);
+                        d.newStats[i] = statsEl;
+                    }
+                });
+                d.stats.forEach(s => { s.classList.remove('visible'); s.innerHTML = ''; });
+                d.newStats.forEach(s => { s.classList.remove('visible'); s.innerHTML = ''; });
+
+                // Reset existing blocks to mixed positions
+                const fileSlots = [0, 0, 0];
+                d.blocks.forEach((b, i) => {
+                    const md = d.mixedData[i];
+                    const fileIdx = md.file;
+                    const slotIdx = fileSlots[fileIdx];
+                    fileSlots[fileIdx]++;
+                    b.fileIdx = fileIdx;
+                    b.slotIdx = slotIdx;
+                    b.el.className = 'data-block panel-level ' + b.region;
+                    b.el.classList.remove('faded');
+                    const fileLeft = 65 + fileIdx * 160;
+                    b.el.style.left = (fileLeft + 25) + 'px';  // 中央寄せ
+                    b.el.style.top = (10 + 28 + slotIdx * 22) + 'px';
+                    b.el.style.opacity = '1';
+                });
+
+                // Reset new blocks (hidden) - 小さいファイル用の位置とサイズ
+                const newFileSlots = [0, 0];
+                const newFileLefts = [550, 550 + 110];
+                d.newBlocks.forEach((b, i) => {
+                    const md = d.newMixedData[i];
+                    const fileIdx = md.file;
+                    const slotIdx = newFileSlots[fileIdx];
+                    newFileSlots[fileIdx]++;
+                    b.fileIdx = fileIdx;
+                    b.slotIdx = slotIdx;
+                    b.el.className = 'data-block panel-level ' + b.region;
+                    b.el.classList.remove('faded');
+                    // 小さいサイズに戻す
+                    b.el.style.width = '70px';
+                    b.el.style.height = '16px';
+                    b.el.style.fontSize = '7px';
+                    b.el.style.left = (newFileLefts[fileIdx] + 5) + 'px';
+                    b.el.style.top = (10 + 105 + 22 + slotIdx * 18) + 'px';
+                    b.el.style.opacity = '0';
+                });
+
+                stepEl.innerHTML = `<span class="num">1</span>${steps[0]}`;
+                queryEl.innerHTML = '';
+                msgEl.textContent = '各ファイルに東京都・大阪府・北海道がバラバラに格納';
+                msgEl.className = 'info-message';
+            } else if (step === 1) {
+                stepEl.innerHTML = `<span class="num">2</span>${steps[1]}`;
+                queryEl.innerHTML = '<span class="command">CLUSTER BY</span> (region)';
+                msgEl.textContent = '📝「地域」でデータをまとめる設定ON（ファイルはまだそのまま）';
+                msgEl.className = 'info-message';
+            } else if (step === 2) {
+                // 初回OPTIMIZE: File 1-3 間でファイル間移動
+                isAnimating = true;
+                d.files.forEach(f => f.classList.add('processing'));
+
+                // Animate blocks moving to target positions
+                d.blocks.forEach((b, i) => {
+                    const target = d.targetPositions[i];
+                    const newFileIdx = target.file;
+                    const newSlotIdx = target.slot;
+
+                    setTimeout(() => {
+                        b.el.style.opacity = '0.5';
+                        const newFileLeft = 65 + newFileIdx * 160;
+                        b.el.style.left = (newFileLeft + 25) + 'px';  // 中央寄せ
+                        b.el.style.top = (10 + 28 + newSlotIdx * 22) + 'px';
+                        b.fileIdx = newFileIdx;
+                        b.slotIdx = newSlotIdx;
+                        setTimeout(() => { b.el.style.opacity = '1'; }, 400);
+                    }, i * 80);
+                });
+
+                // Show stats after animation
+                const statsInfo = [
+                    { min: '大阪', max: '東京' },      // File 1: 東京中心
+                    { min: '大阪', max: '北海道' },    // File 2: 大阪中心
+                    { min: '北海道', max: '北海道' }   // File 3: 北海道のみ
+                ];
+                setTimeout(() => {
+                    d.files.forEach((f, i) => {
+                        f.classList.remove('processing');
+                        f.classList.add('optimized');
+                        d.stats[i].innerHTML = `<span class="stat-label">min:</span><span class="stat-value">${statsInfo[i].min}</span><span class="stat-label">max:</span><span class="stat-value">${statsInfo[i].max}</span>`;
+                        d.stats[i].classList.add('visible');
+                    });
+                    isAnimating = false;
+                }, d.blocks.length * 80 + 500);
+
+                stepEl.innerHTML = `<span class="num">3</span>${steps[2]}`;
+                queryEl.innerHTML = '<span class="command">OPTIMIZE</span> table';
+                msgEl.textContent = '🔄 初回は全ファイル書き換え（File 1〜3 間でデータ再配置）';
+                msgEl.className = 'info-message';
+            } else if (step === 3) {
+                // 新規ファイル到着（スキュー発生）
+                d.newFiles.forEach((f, i) => setTimeout(() => { f.style.opacity = '1'; }, i * 150));
+                d.newBlocks.forEach((b, i) => setTimeout(() => { b.el.style.opacity = '1'; }, 300 + i * 50));
+                stepEl.innerHTML = `<span class="num">4</span>${steps[3]}`;
+                queryEl.innerHTML = '';
+                msgEl.innerHTML = '📥 <strong>小さいファイル</strong>が到着 → ファイルサイズに<strong>スキュー（偏り）</strong>発生！';
+                msgEl.className = 'info-message warning';
+            } else if (step === 4) {
+                // 2回目OPTIMIZE: スキュー解消 → 全ファイルが同じサイズになる！
+                isAnimating = true;
+
+                // 全ファイルを処理中に
+                d.files.forEach(f => f.classList.add('processing'));
+                d.newFiles.forEach(f => f.classList.add('processing'));
+
+                // スキュー解消のアニメーション：
+                // 小さいファイル(FILE 4, 5)が統合されて、FILE 4が正常サイズになる
+                // FILE 5は消える
+
+                // FILE 5のブロックをFILE 4に移動
+                const file4Left = 550;
+                setTimeout(() => {
+                    // FILE 5のブロック(index 3, 4)をFILE 4に移動
+                    d.newBlocks.forEach((b, i) => {
+                        if (b.fileIdx === 1) {  // FILE 5のブロック
+                            b.el.style.opacity = '0.5';
+                            b.el.style.left = (file4Left + 5) + 'px';
+                            b.el.style.top = (10 + 105 + 22 + (3 + (i - 3)) * 18) + 'px';
+                            b.fileIdx = 0;  // FILE 4に移動
+                            setTimeout(() => { b.el.style.opacity = '1'; }, 300);
+                        }
+                    });
+                }, 300);
+
+                // FILE 4を正常サイズに拡大、FILE 5を消す
+                setTimeout(() => {
+                    // FILE 5を消す
+                    d.newFiles[1].style.opacity = '0';
+                    d.newStats[1].classList.remove('visible');
+
+                    // FILE 4を正常サイズに拡大（既存ファイルと同じサイズに！）
+                    d.newFiles[0].style.width = '150px';
+                    d.newFiles[0].style.height = '175px';
+                    d.newFiles[0].style.top = '10px';
+                    d.newFiles[0].innerHTML = '<div class="container-label">FILE 4</div>';
+                    d.newFiles[0].classList.remove('processing', 'new-file');
+                    d.newFiles[0].classList.add('optimized');
+
+                    // FILE 4内のブロックを再配置（正常サイズで）
+                    d.newBlocks.forEach((b, i) => {
+                        b.el.style.width = '100px';
+                        b.el.style.height = '20px';
+                        b.el.style.fontSize = '8px';
+                        b.el.style.left = (file4Left + 25) + 'px';
+                        b.el.style.top = (10 + 28 + i * 22) + 'px';
+                        b.fileIdx = 0;
+                        b.slotIdx = i;
+                    });
+
+                    // FILE 4のstatsを追加
+                    d.newStats[0].innerHTML = '<span class="stat-label">min:</span><span class="stat-value">大阪</span><span class="stat-label">max:</span><span class="stat-value">東京</span>';
+                    d.newStats[0].classList.add('visible');
+
+                    d.files.forEach(f => {
+                        f.classList.remove('processing');
+                        f.classList.add('optimized');
+                    });
+
+                    isAnimating = false;
+                }, 800);
+
+                stepEl.innerHTML = `<span class="num">5</span>${steps[4]}`;
+                queryEl.innerHTML = '<span class="command">OPTIMIZE</span> table';
+                msgEl.innerHTML = '✨ <strong>全ファイルが同じサイズに！</strong>（小→統合、大→分割）= <strong>スキュー解消！</strong>';
+                msgEl.className = 'info-message success';
+            } else if (step === 5) {
+                // ファイルレベルのスキップ（min/max統計を見て判断）
+                // 均一化後: File 1,4 = 東京あり、File 2,3 = 東京なし
+                const fileHasTokyo = [true, false, false];  // File 1-3
+                const file4HasTokyo = true;  // FILE 4 has tokyo
+
+                // まず全ファイル・ブロックの opacity をリセット
+                d.files.forEach(f => { f.style.opacity = '1'; });
+                d.blocks.forEach(b => { b.el.style.opacity = '1'; });
+                d.newBlocks.forEach(b => { b.el.style.opacity = '1'; });
+
+                d.files.forEach((f, i) => {
+                    f.classList.remove('optimized');
+                    if (fileHasTokyo[i]) {
+                        f.classList.add('highlighted');
+                        f.classList.remove('faded');
+                    } else {
+                        f.classList.add('faded');
+                        f.classList.remove('highlighted');
+                    }
+                });
+
+                // FILE 4（正常サイズになった新ファイル）
+                d.newFiles[0].classList.remove('optimized');
+                if (file4HasTokyo) {
+                    d.newFiles[0].classList.add('highlighted');
+                    d.newFiles[0].classList.remove('faded');
+                } else {
+                    d.newFiles[0].classList.add('faded');
+                }
+
+                // クエリ結果を表示（既存ブロック）
+                d.blocks.forEach(b => {
+                    b.el.style.opacity = '';
+                    if (!fileHasTokyo[b.fileIdx]) {
+                        b.el.classList.add('faded');
+                    } else if (b.region === 'tokyo') {
+                        b.el.classList.remove('faded');
+                    } else {
+                        b.el.classList.add('faded');
+                    }
+                });
+
+                // FILE 4内のブロック
+                d.newBlocks.forEach(b => {
+                    b.el.style.opacity = '';
+                    if (b.region === 'tokyo') {
+                        b.el.classList.remove('faded');
+                    } else {
+                        b.el.classList.add('faded');
+                    }
+                });
+
+                stepEl.innerHTML = `<span class="num">6</span>${steps[5]}`;
+                queryEl.innerHTML = '<span class="keyword">WHERE</span> region = <span class="value">\'東京\'</span>';
+                msgEl.innerHTML = '🏆 File 2,3 スキップ！<strong>均一ファイルサイズ + 増分処理 + 高速クエリ = 最強！</strong>';
+                msgEl.className = 'info-message success';
+            }
+        }
+
+        function initSummary() {
+            const panel = document.getElementById('panel-summary');
+            panel.innerHTML = `
+                <div class="summary-content">
+                    <div style="text-align:center; margin-bottom:24px;">
+                        <img src="data_optimization.png" alt="OPTIMIZEの動作比較" style="max-width:100%; border-radius:12px;">
+                    </div>
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>項目</th>
+                                <th class="col-part">Partitioning</th>
+                                <th class="col-zorder">ZORDER</th>
+                                <th class="col-liquid">Liquid Clustering</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th>概要</th>
+                                <td>データをフォルダ単位で分割</td>
+                                <td>ファイル内のデータを並べ替え</td>
+                                <td>増分処理 + スキュー平滑化<br>（ファイルサイズ自動均一化）</td>
+                            </tr>
+                            <tr>
+                                <th>設定方法</th>
+                                <td><span class="cmd">PARTITION BY</span><br>（テーブル作成時）</td>
+                                <td><span class="cmd">OPTIMIZE ZORDER BY</span><br>（毎回指定）</td>
+                                <td><span class="cmd">CLUSTER BY</span><br>（ALTERで変更可能）</td>
+                            </tr>
+                            <tr>
+                                <th>スキップ単位</th>
+                                <td>フォルダ単位</td>
+                                <td>ファイル単位</td>
+                                <td>ファイル単位</td>
+                            </tr>
+                            <tr>
+                                <th>OPTIMIZEの動き</th>
+                                <td>コンパクションのみ<br>（並び替えなし）</td>
+                                <td class="warn">全ファイル再書き込み</td>
+                                <td class="good">増分処理 +<br><strong>スキュー自動解消</strong></td>
+                            </tr>
+                            <tr>
+                                <th>適したカラム</th>
+                                <td>低カーディナリティ<br>（地域、年月）</td>
+                                <td>フィルタで使うカラム<br>（高カーディナリティOK）</td>
+                                <td>フィルタで使うカラム<br>（高カーディナリティOK）</td>
+                            </tr>
+                            <tr>
+                                <th>柔軟性</th>
+                                <td class="warn">低い<br>（変更に再作成必要）</td>
+                                <td>中<br>（毎回指定）</td>
+                                <td class="good">高い<br>（ALTERで変更可能）</td>
+                            </tr>
+                            <tr>
+                                <th>運用コスト</th>
+                                <td class="good">低い</td>
+                                <td class="warn">高い<br>（フルOPTIMIZE）</td>
+                                <td class="good">低い<br>（増分OPTIMIZE）</td>
+                            </tr>
+                            <tr>
+                                <th>ユースケース</th>
+                                <td>常に同じ条件で絞る</td>
+                                <td>更新少ない or 静的データ</td>
+                                <td>大規模・頻繁更新<br>（ZORDERの代替）</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function initAnimation() {
+            if (currentTab === 'partitioning') { initPartitioning(); partitioningStep(0); }
+            else if (currentTab === 'zorder') { initZorder(); zorderStep(0); }
+            else if (currentTab === 'liquid') { initLiquid(); liquidStep(0); }
+            else if (currentTab === 'summary') { initSummary(); }
+        }
+
+        function nextStep() {
+            if (isAnimating) return; // アニメーション中は無視
+            const max = config[currentTab].steps.length;
+            currentStep++;
+            if (currentStep >= max) currentStep = 0;
+            if (currentTab === 'partitioning') partitioningStep(currentStep);
+            else if (currentTab === 'zorder') zorderStep(currentStep);
+            else if (currentTab === 'liquid') liquidStep(currentStep);
+            updateUI();
+        }
+
+        function reset() {
+            currentStep = 0;
+            isAnimating = false;
+            initAnimation();
+            updateUI();
+        }
+
+        async function autoPlay() {
+            reset();
+            const max = config[currentTab].steps.length;
+            for (let i = 0; i < max; i++) {
+                // アニメーション完了を待つ
+                while (isAnimating) await new Promise(r => setTimeout(r, 100));
+                await new Promise(r => setTimeout(r, 1500));
+                nextStep();
+            }
+        }
+
+        window.onload = () => switchTab('partitioning');
+    </script>
+</body>
+</html>
